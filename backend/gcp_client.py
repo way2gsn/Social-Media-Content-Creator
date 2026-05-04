@@ -39,24 +39,18 @@ class GCPClient:
             self.key_data = json.load(f)
         
         self.project_id = self.key_data['project_id']
-        self.location = "asia-south1" # Fast text region
-        self.image_location = "us-central1" # Only region for Imagen
+        self.location = "us-central1" # Reverted to original working region
         self.credentials = service_account.Credentials.from_service_account_info(self.key_data)
         
-        # 1. Initialize for Image (US) - Imagen ONLY lives in us-central1
-        print(f"GCP: Loading Image AI from us-central1...")
-        vertexai.init(project=self.project_id, location="us-central1", credentials=self.credentials)
-        from vertexai.preview.vision_models import ImageGenerationModel
-        self.image_model = ImageGenerationModel.from_pretrained("imagegeneration@006")
+        print(f"GCP: Initializing in {self.location}...")
+        vertexai.init(project=self.project_id, location=self.location, credentials=self.credentials)
         
-        # 2. Initialize for Text (Mumbai) - Fast region for your location
-        print(f"GCP: Initializing Text AI in asia-south1...")
-        vertexai.init(project=self.project_id, location="asia-south1", credentials=self.credentials)
+        # Original models that were working
         self.text_model = GenerativeModel("gemini-1.5-flash")
         self.pro_model = GenerativeModel("gemini-1.5-pro")
+        self.image_model = ImageGenerationModel.from_pretrained("imagegeneration@006")
 
         self.initialized = True
-
     async def generate_text(self, prompt, system_instruction=None, json_mode=True, use_pro=False):
         """Generates text using Gemini 1.5 Flash or Pro."""
         model = self.pro_model if use_pro else self.text_model
