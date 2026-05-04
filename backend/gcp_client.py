@@ -44,9 +44,9 @@ class GCPClient:
         self.credentials = service_account.Credentials.from_service_account_info(self.key_data)
         vertexai.init(project=self.project_id, location=self.location, credentials=self.credentials)
         
-        # Models - Updated to stable versions for production reliability
-        self.text_model = GenerativeModel("gemini-1.5-flash")
-        self.pro_model = GenerativeModel("gemini-1.5-pro")
+        # Models - Switched to 1.0-pro for maximum compatibility across all GCP projects
+        self.text_model = GenerativeModel("gemini-1.0-pro")
+        self.pro_model = GenerativeModel("gemini-1.0-pro")
         self.image_model = ImageGenerationModel.from_pretrained("imagegeneration@006")
         
         self.initialized = True
