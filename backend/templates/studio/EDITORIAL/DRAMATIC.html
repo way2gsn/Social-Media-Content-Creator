@@ -20,17 +20,29 @@
             position: relative;
         }
 
-        /* Full-Bleed AI Image */
-        .hero-bg {
+        /* Full-Bleed AI Image — two-layer: blurred bg + sharp foreground */
+        .hero {
             position: absolute;
             inset: 0;
             z-index: 1;
         }
-        .hero-bg img {
+        .hero-bg {
+            position: absolute;
+            inset: 0;
             width: 100%;
             height: 100%;
             object-fit: cover;
-            filter: brightness(0.85) contrast(1.1);
+            filter: blur(40px) brightness(0.4);
+            transform: scale(1.1);
+        }
+        .hero-img {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center 25%;
+            filter: brightness(0.9) contrast(1.1);
+            z-index: 2;
         }
 
         /* Cinematic Bottom Gradient */
@@ -134,9 +146,10 @@
     </style>
 </head>
 <body>
-    <div class="hero-bg">
+    <div class="hero">
         {% if image_url %}
-        <img src="{{ image_url }}">
+        <img src="{{ image_url }}" class="hero-bg">
+        <img src="{{ image_url }}" class="hero-img">
         {% endif %}
     </div>
 
