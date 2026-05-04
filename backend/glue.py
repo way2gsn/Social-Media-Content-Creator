@@ -16,16 +16,17 @@ from PIL import Image, ImageEnhance
 import io
 from gcp_client import get_gcp_client
 # Constants
+BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(BACKEND_DIR)
 
-# Constants
-GCP_KEY_PATH = "key.json"
-OUTPUT_DIR = "../static/output"
-STATIC_DIR = "../static"
-DB_PATH = "automation.db"
-LOGO_PATH = "../Logo.png"
+GCP_KEY_PATH = os.path.join(BACKEND_DIR, "key.json")
+STATIC_DIR = os.path.join(ROOT_DIR, "static")
+OUTPUT_DIR = os.path.join(STATIC_DIR, "output")
+DB_PATH = os.path.join(BACKEND_DIR, "automation.db")
+LOGO_PATH = os.path.join(ROOT_DIR, "Logo.png")
 
 # Studio Templates Directory
-STUDIO_TEMPLATES_DIR = "templates/studio"
+STUDIO_TEMPLATES_DIR = os.path.join(BACKEND_DIR, "templates", "studio")
 
 class DatabaseManager:
     @staticmethod
@@ -392,10 +393,11 @@ class InstagramEngine:
         
         # Logo Logic
         self.logo_base64 = None
-        logo_path = "../Logo.png"
-        if os.path.exists(logo_path):
-            with open(logo_path, "rb") as f:
+        if os.path.exists(LOGO_PATH):
+            with open(LOGO_PATH, "rb") as f:
                 self.logo_base64 = base64.b64encode(f.read()).decode()
+        else:
+            print(f"DEBUG: Logo NOT FOUND at {LOGO_PATH}")
 
 
     def frame_character(self, img, side="center", width=1080, height=1920):
@@ -482,7 +484,8 @@ class InstagramEngine:
                 
                 await page.set_content(html, wait_until='domcontentloaded', timeout=60000)
                 # Wait for any external assets (like Google Fonts or web images) to load
-                await asyncio.sleep(3) 
+                # Increased to 5s for GCP server stability
+                await asyncio.sleep(5) 
                 
                 output_path = os.path.join(OUTPUT_DIR, filename)
                 # Clip the screenshot to the exact dimensions of the aspect ratio

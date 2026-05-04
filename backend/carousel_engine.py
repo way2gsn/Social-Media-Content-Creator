@@ -7,9 +7,9 @@ from datetime import datetime
 from jinja2 import Template
 from playwright.async_api import async_playwright
 import urllib.parse
-from glue import LOGO_PATH, OUTPUT_DIR, AISummarizer
+from glue import LOGO_PATH, OUTPUT_DIR, AISummarizer, BACKEND_DIR, STATIC_DIR
 
-CAROUSEL_TEMPLATES_DIR = "templates/carousel"
+CAROUSEL_TEMPLATES_DIR = os.path.join(BACKEND_DIR, "templates", "carousel")
 
 class CarouselEngine:
     def __init__(self):
@@ -22,8 +22,8 @@ class CarouselEngine:
         # Heritage BGs Logic
         self.heritage_dark_bg = None
         self.heritage_light_bg = None
-        dark_path = "../static/assets/Dark_BG.png"
-        light_path = "../static/assets/Light_BG.png"
+        dark_path = os.path.join(STATIC_DIR, "assets", "Dark_BG.png")
+        light_path = os.path.join(STATIC_DIR, "assets", "Light_BG.png")
         if os.path.exists(dark_path):
             with open(dark_path, "rb") as f:
                 self.heritage_dark_bg = base64.b64encode(f.read()).decode()

@@ -15,9 +15,9 @@ try:
 except ImportError:
     REMBG_AVAILABLE = False
 
-from glue import LOGO_PATH, OUTPUT_DIR, InstagramEngine, NewsFetcher, AISummarizer
+from glue import LOGO_PATH, OUTPUT_DIR, AISummarizer, BACKEND_DIR, STATIC_DIR
 
-EXPL_TEMPLATES_DIR = "templates/explainer"
+EXPL_TEMPLATES_DIR = os.path.join(BACKEND_DIR, "templates", "explainer")
 
 class ExplainerEngine:
     def __init__(self):
