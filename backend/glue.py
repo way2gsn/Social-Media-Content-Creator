@@ -254,7 +254,10 @@ class NewsFetcher:
         print(f"DEBUG: Starting hero extraction for {url}")
         try:
             async with async_playwright() as p:
-                browser = await p.chromium.launch()
+                browser = await p.chromium.launch(
+                    headless=True,
+                    args=["--no-sandbox", "--disable-dev-shm-usage", "--allow-file-access-from-files", "--disable-web-security"]
+                )
                 context = await browser.new_context(user_agent="Mozilla/5.0 (iPhone; CPU iPhone OS 14_7_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Mobile/15E148 Safari/604.1")
                 page = await context.new_page()
                 await page.goto(url, wait_until='domcontentloaded', timeout=45000)
@@ -472,7 +475,10 @@ class InstagramEngine:
     async def render_post(self, data, template_str, filename, width=1080, height=1920):
         try:
             async with async_playwright() as p:
-                browser = await p.chromium.launch()
+                browser = await p.chromium.launch(
+                    headless=True,
+                    args=["--no-sandbox", "--disable-dev-shm-usage", "--allow-file-access-from-files", "--disable-web-security"]
+                )
                 # Set the viewport to match the requested aspect ratio
                 context = await browser.new_context(viewport={'width': width, 'height': height})
                 page = await context.new_page()

@@ -170,7 +170,10 @@ class CarouselEngine:
         
         total_slides = len(plan_data)
         async with async_playwright() as p:
-            browser = await p.chromium.launch()
+            browser = await p.chromium.launch(
+                headless=True,
+                args=["--no-sandbox", "--disable-dev-shm-usage", "--allow-file-access-from-files", "--disable-web-security"]
+            )
             # Enable local file access for base.css
             context = await browser.new_context(
                 viewport={'width': 1080, 'height': 1350},
