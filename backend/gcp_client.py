@@ -39,16 +39,34 @@ class GCPClient:
             self.key_data = json.load(f)
         
         self.project_id = self.key_data['project_id']
-        self.location = "us-east1" # Most stable region for Vertex AI
-        
         self.credentials = service_account.Credentials.from_service_account_info(self.key_data)
-        vertexai.init(project=self.project_id, location=self.location, credentials=self.credentials)
         
-        # Models - Using specific versions for 100% production reliability
-        self.text_model = GenerativeModel("gemini-1.5-flash-002")
-        self.pro_model = GenerativeModel("gemini-1.5-pro-002")
-        self.image_model = ImageGenerationModel.from_pretrained("imagegeneration@006")
+        # AUTO-REGION DETECTION: We will try regions until one works
+        self.working_location = None
+        for loc in ["us-central1", "us-east4", "us-east1"]:
+            try:
+                vertexai.init(project=self.project_id, location=loc, credentials=self.credentials)
+                test_model = GenerativeModel("gemini-1.5-flash")
+                # Quick check if it's available
+                self.location = loc
+                self.text_model = test_model
+                self.pro_model = GenerativeModel("gemini-1.5-pro")
+                self.image_model = ImageGenerationModel.from_pretrained("imagegeneration@006")
+                print(f"GCP: Successfully initialized in {loc}")
+                self.working_location = loc
+                break
+            except Exception as e:
+                print(f"GCP: {loc} not available, trying next...")
+                continue
         
+        if not self.working_location:
+            # Fallback to us-central1 if all else fails
+            self.location = "us-central1"
+            vertexai.init(project=self.project_id, location=self.location, credentials=self.credentials)
+            self.text_model = GenerativeModel("gemini-1.5-flash")
+            self.pro_model = GenerativeModel("gemini-1.5-pro")
+            self.image_model = ImageGenerationModel.from_pretrained("imagegeneration@006")
+
         self.initialized = True
 
     async def generate_text(self, prompt, system_instruction=None, json_mode=True, use_pro=False):
