@@ -39,16 +39,16 @@ class GCPClient:
             self.key_data = json.load(f)
         
         self.project_id = self.key_data['project_id']
-        self.location = "us-central1" # Reverted to original working region
+        self.location = "us-central1" # Original working region
         self.credentials = service_account.Credentials.from_service_account_info(self.key_data)
         
         print(f"GCP: Initializing in {self.location}...")
         vertexai.init(project=self.project_id, location=self.location, credentials=self.credentials)
         
-        # Original models that were working
-        self.text_model = GenerativeModel("gemini-1.5-flash")
-        self.pro_model = GenerativeModel("gemini-1.5-pro")
-        self.image_model = ImageGenerationModel.from_pretrained("imagegeneration@006")
+        # Using the most legacy-compatible model strings
+        self.text_model = GenerativeModel("gemini-pro")
+        self.pro_model = GenerativeModel("gemini-pro")
+        self.image_model = ImageGenerationModel.from_pretrained("imagegeneration@002")
 
         self.initialized = True
     async def generate_text(self, prompt, system_instruction=None, json_mode=True, use_pro=False):
