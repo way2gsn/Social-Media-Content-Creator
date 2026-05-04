@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Space+Grotesk:wght@300;700&display=swap');
+        
+        :root {
+            --accent: #e11d48; 
+            --bg: #000000;
+            --text: #ffffff;
+        }
+
+        .theme-TECH { --accent: #06b6d4; }
+        .theme-CULTURE { --accent: #f59e0b; }
+        .theme-CRIME { --accent: #991b1b; }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        html, body {
+            width: 1080px;
+            height: {{ view_height }}px;
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Outfit', sans-serif;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* 1. Full Canvas Background */
+        .background-container {
+            position: absolute;
+            inset: 0;
+            z-index: 1;
+        }
+
+        .bg-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            filter: contrast(1.1) brightness(0.9);
+        }
+
+        /* 2. Character Cutout (Layered on top of BG but behind text) */
+        .character-container {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 5;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+        }
+
+        .character-cutout {
+            height: 90%;
+            width: auto;
+            object-fit: contain;
+            filter: drop-shadow(0 0 50px rgba(0,0,0,0.8));
+        }
+
+        /* 3. Linear Gradient Scrims */
+        .scrim-top {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 45%;
+            background: linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.85) 40%, rgba(0,0,0,0.4) 70%, transparent 100%);
+            z-index: 10;
+            padding: 100px 80px;
+        }
+
+        .scrim-bottom {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 55%;
+            background: linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,0.9) 40%, rgba(0,0,0,0.4) 70%, transparent 100%);
+            z-index: 10;
+            padding: 100px 80px;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+        }
+
+        /* 4. Typography */
+        .masthead {
+            position: absolute;
+            top: 60px;
+            left: 60px;
+            right: 60px;
+            display: flex;
+            justify-content: space-between;
+            z-index: 100;
+        }
+        .brand { font-weight: 900; font-size: 18px; text-transform: uppercase; letter-spacing: 2px; }
+        .brand span { color: var(--accent); }
+        .slide-idx { font-weight: 700; color: var(--accent); opacity: 0.8; }
+
+        .headline {
+            font-family: 'Playfair Display', serif;
+            font-size: 60px;
+            font-weight: 900;
+            line-height: 1.1;
+            margin-bottom: 20px;
+            color: #fff;
+            text-transform: uppercase;
+        }
+
+        .headline .highlight, .point-text .highlight {
+            color: var(--accent);
+            font-weight: 900;
+        }
+
+        .point-text {
+            font-size: 28px;
+            line-height: 1.5;
+            color: #f1f5f9;
+            font-weight: 500;
+            max-width: 90%;
+            border-left: 8px solid var(--accent);
+            padding-left: 40px;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+        }
+
+        .category-tag {
+            font-size: 14px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 5px;
+            color: var(--accent);
+            margin-bottom: 15px;
+            display: block;
+        }
+        
+    </style>
+</head>
+<body class="theme-{{ theme }}">
+    <!-- 1. Background Image -->
+    <div class="background-container">
+        {% if original_image %}
+        <img src="{{ original_image }}" class="bg-img">
+        {% endif %}
+    </div>
+
+    <!-- 2. Character (Optional Layer) -->
+    {% if cutout_base64 %}
+    <div class="character-container">
+        <img src="data:image/png;base64,{{ cutout_base64 }}" class="character-cutout">
+    </div>
+    {% endif %}
+
+    <div class="masthead">
+        <div class="brand">Humorously Indians<span>.</span></div>
+        <div class="slide-idx">{{ slide_index }} / {{ total_slides }}</div>
+    </div>
+
+    <!-- 3. Text Content with Scrims -->
+    <div class="scrim-top">
+        <span class="category-tag">Insight Report</span>
+        <h1 class="headline">{{ headline }}</h1>
+    </div>
+
+    <div class="scrim-bottom">
+        <p class="point-text">{{ current_point }}</p>
+    </div>
+
+</body>
+</html>

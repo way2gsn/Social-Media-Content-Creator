@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="base.css">
+</head>
+<body>
+    <div class="container" style="justify-content: center; align-items: center; text-align: center;">
+        <div class="slide-counter">STRATEGIC SPIN // {{ slide_index + 1 }}</div>
+        
+        <div style="max-width: 900px; padding: 60px; border: 4px solid var(--rule-strong); position: relative;">
+            <div style="position: absolute; top: -30px; left: 50%; transform: translateX(-50%); background: #ffffff; padding: 0 20px;">
+                <span style="font-family: 'Syne', sans-serif; font-weight: 800; font-size: 20px;">OFFICIAL POSITION</span>
+            </div>
+            
+            <h1 class="headline-main" style="font-size: 64px; line-height: 1.2;">
+                "{{ headline }}"
+            </h1>
+            
+            <div class="h-rule" style="width: 80px; margin: 40px auto; background-color: var(--accent); height: 4px;"></div>
+            
+            <p class="sub-headline" style="color: var(--text); font-weight: 700; font-size: 28px;">
+                {{ subtitle | default("Strategic adjustments for optimal public perception.") }}
+            </p>
+        </div>
+    </div>
+
+    <div class="footer">
+        <span>© 2026 HUMOROUSLY INDIANS</span>
+        <img src="/Volumes/Ghanshyam SSD1/Social Media Content Creator/Logo.png" class="brand-logo" alt="Logo">
+    </div>
+</body>
+</html>

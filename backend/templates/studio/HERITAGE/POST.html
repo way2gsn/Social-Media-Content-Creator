@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@800;900&family=Inter:wght@400;700;800&display=swap');
+        
+        :root {
+            --canvas-width: {{ width }}px;
+            --canvas-height: {{ height }}px;
+            
+            /* V5.0 Immersive Palette */
+            {% if heritage_mode == 'light' %}
+            --gradient-start: rgba(255, 255, 255, 0.95);
+            --gradient-mid: rgba(255, 255, 255, 0.7);
+            --gradient-end: rgba(255, 255, 255, 0);
+            --accent: #b91c1c;
+            --text-main: #020617;
+            --text-sub: #334155;
+            --heritage-bg: url('data:image/png;base64,{{ light_bg_base64 }}');
+            --blend-mode: multiply;
+            {% else %}
+            --gradient-start: rgba(2, 6, 23, 0.95);
+            --gradient-mid: rgba(2, 6, 23, 0.6);
+            --gradient-end: rgba(2, 6, 23, 0);
+            --accent: #f59e0b;
+            --text-main: #ffffff;
+            --text-sub: #94a3b8;
+            --heritage-bg: url('data:image/png;base64,{{ dark_bg_base64 }}');
+            --blend-mode: overlay;
+            {% endif %}
+        }
+
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body, html { 
+            width: var(--canvas-width); 
+            height: var(--canvas-height); 
+            overflow: hidden; 
+            background: #000;
+            font-family: 'Inter', sans-serif;
+            color: var(--text-main);
+            position: relative;
+        }
+
+        /* V5.0 Full-Canvas Hero */
+        .hero-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 1;
+            filter: contrast(1.1) brightness(0.9);
+        }
+
+        /* Heritage Texture Layer */
+        .heritage-texture {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: var(--heritage-bg);
+            background-size: cover;
+            background-position: center;
+            opacity: 0.15;
+            mix-blend-mode: var(--blend-mode);
+            z-index: 2;
+        }
+
+        /* Cinematic Gradient Overlay */
+        .cinematic-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 80%; /* Deep Fade */
+            background: linear-gradient(to top, var(--gradient-start) 10%, var(--gradient-mid) 40%, var(--gradient-end) 100%);
+            z-index: 10;
+        }
+
+        /* Content Layer */
+        .content-container {
+            position: absolute;
+            bottom: 80px;
+            left: 0;
+            width: 100%;
+            z-index: 20;
+            padding: 80px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .topic-row {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            margin-bottom: 10px;
+        }
+
+        .topic-pill {
+            background: var(--accent);
+            color: #fff;
+            padding: 8px 20px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+        }
+
+        .live-tag {
+            color: var(--accent);
+            font-weight: 900;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .live-tag::before {
+            content: "";
+            width: 8px;
+            height: 8px;
+            background: var(--accent);
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.95); opacity: 0.8; }
+            50% { transform: scale(1.2); opacity: 1; }
+            100% { transform: scale(0.95); opacity: 0.8; }
+        }
+
+        .headline {
+            font-family: 'Outfit', sans-serif;
+            font-size: 84px;
+            font-weight: 900;
+            line-height: 0.9;
+            letter-spacing: -4px;
+            text-transform: uppercase;
+            color: var(--text-main);
+        }
+
+        .subtitle {
+            font-size: 32px;
+            font-weight: 600;
+            line-height: 1.3;
+            color: var(--text-sub);
+            max-width: 90%;
+        }
+
+        /* Branding V5.0 Edge Anchor */
+        .branding-row {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            margin-top: 40px;
+            padding-top: 30px;
+            border-top: 1px solid rgba(127,127,127,0.2);
+            width: fit-content;
+        }
+
+        .logo { height: 40px; border-radius: 50%; }
+        .brand-info { display: flex; flex-direction: column; }
+        .brand-name { font-weight: 900; text-transform: uppercase; font-size: 14px; letter-spacing: 1px; color: var(--text-main); }
+        .brand-handle { font-size: 12px; font-weight: 700; color: var(--accent); }
+
+        /* V5.1 Subject Cutout Layer */
+        .subject-cutout {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 15; /* Above overlay, below content */
+            object-fit: contain;
+            filter: drop-shadow(0 30px 60px rgba(0,0,0,0.6));
+            pointer-events: none;
+            transform: translateY(20px); /* Slight bleed for dynamic feel */
+        }
+
+    </style>
+</head>
+<body>
+    {% if image_url %}
+    <img src="{{ image_url }}" class="hero-canvas">
+    {% else %}
+    <img src="https://loremflickr.com/1080/1920/india,news" class="hero-canvas">
+    {% endif %}
+    
+    <div class="heritage-texture"></div>
+    <div class="cinematic-overlay"></div>
+
+    {% if cutout_base64 %}
+    <img src="data:image/png;base64,{{ cutout_base64 }}" class="subject-cutout">
+    {% endif %}
+
+    <div class="content-container">
+        <div class="topic-row">
+            <div class="topic-pill">Insight</div>
+            <div class="live-tag">Verified Source</div>
+        </div>
+
+        <h1 class="headline">{{ headline }}</h1>
+        <p class="subtitle">{{ subtitle }}</p>
+
+        <div class="branding-row">
+            <img src="data:image/png;base64,{{ logo_base64 }}" class="logo">
+            <div class="brand-info">
+                <span class="brand-name">Humorously Indians</span>
+                <span class="brand-handle">@humorously_indians</span>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="base.css">
+</head>
+<body>
+    {% if image_url %}
+    <div class="news-visual">
+        <img src="{{ image_url }}" alt="Background">
+    </div>
+    {% endif %}
+    
+    <div class="container" style="justify-content: flex-end;">
+        <div class="slide-counter">HUMOROUSLY INDIANS // {{ slide_index + 1 }}</div>
+        <hr class="h-rule-strong" style="width: 100px;">
+        <h1 class="headline-main">{{ headline }}</h1>
+        <p class="sub-headline" style="margin-top: 20px;">
+            {{ subtitle | default("A modern analysis of the current situation.") }}
+        </p>
+    </div>
+
+    <div class="footer">
+        <span>© 2026 HUMOROUSLY INDIANS</span>
+        <img src="/Volumes/Ghanshyam SSD1/Social Media Content Creator/Logo.png" class="brand-logo" alt="Logo">
+    </div>
+</body>
+</html>

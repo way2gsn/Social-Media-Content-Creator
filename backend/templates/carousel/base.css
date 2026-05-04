@@ -1,0 +1,140 @@
+/* V4.0 Carousel Base Design System */
+
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@600;800;900&family=Inter:wght@400;700;800&display=swap');
+
+:root {
+    --canvas-width: 1080px;
+    --canvas-height: 1350px;
+    
+    /* Standard Palette */
+    --accent: #facc15;
+    --bg: #000000;
+    --text: #ffffff;
+    --panel-bg: rgba(255, 255, 255, 0.05);
+}
+
+/* Theme Overrides (Injected via Template) */
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body, html { 
+    width: var(--canvas-width); 
+    height: var(--canvas-height); 
+    overflow: hidden; 
+    background: var(--bg);
+    font-family: 'Inter', sans-serif;
+    color: var(--text);
+}
+
+.carousel-background {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    overflow: hidden;
+}
+
+.heritage-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-size: cover;
+    background-position: center;
+    opacity: 0.15;
+    z-index: 2;
+}
+
+.container {
+    position: relative;
+    z-index: 10;
+    width: 100%;
+    height: 100%;
+    padding: 60px 80px;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Typography tokens */
+.headline-main {
+    font-family: 'Outfit', sans-serif;
+    font-size: 64px;
+    font-weight: 800;
+    line-height: 1;
+    text-transform: uppercase;
+    letter-spacing: -2px;
+}
+
+.sub-headline {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--accent);
+    margin-top: 15px;
+}
+
+.body-text {
+    font-size: 20px;
+    line-height: 1.5;
+    color: #cbd5e1;
+    margin-top: 30px;
+}
+
+/* Components */
+.slide-counter {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 900;
+    font-size: 12px;
+    letter-spacing: 4px;
+    color: var(--accent);
+    margin-bottom: 20px;
+    opacity: 0.8;
+}
+
+.data-panel {
+    background: var(--panel-bg);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 40px;
+    padding: 40px;
+    margin-top: 40px;
+    flex: 1;
+}
+
+.footer {
+    position: absolute;
+    bottom: 60px;
+    left: 80px;
+    right: 80px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding-top: 30px;
+}
+
+.brand-logo { height: 32px; filter: grayscale(0) brightness(1); }
+
+/* Chart Styling overrides */
+.chart-container {
+    width: 100%;
+    height: 400px;
+    margin-top: 40px;
+}
+
+/* Comparison specific */
+.comparison-grid {
+    display: grid;
+    grid-cols: 2;
+    gap: 30px;
+    margin-top: 50px;
+}
+.comp-card {
+    background: rgba(255,255,255,0.05);
+    padding: 40px;
+    border-radius: 30px;
+}
+.comp-label { font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; color: var(--accent); margin-bottom: 15px; }
+.comp-text { font-size: 24px; font-weight: 800; font-family: 'Outfit'; }

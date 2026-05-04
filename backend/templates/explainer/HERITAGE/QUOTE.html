@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1080, height={{ view_height }}">
+    <title>Heritage Bold Quote</title>
+    <link href="https://fonts.googleapis.com/css2?family=Anton&family=Martel:wght@400;900&family=Playfair+Display:ital,wght@1,900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Dynamic Palette based on Mode - REFINED */
+            {% if heritage_mode == 'dark' %}
+            --bg-image: url('data:image/png;base64,{{ dark_bg_base64 }}');
+            --primary: #ff9933;
+            --secondary: #ffd700;
+            --text-main: #ffffff;
+            --overlay: rgba(0, 0, 0, 0.6);
+            {% else %}
+            --bg-image: url('data:image/png;base64,{{ light_bg_base64 }}');
+            --primary: #d91d1d;
+            --secondary: #000000;
+            --text-main: #000000;
+            --overlay: rgba(255, 255, 255, 0.4);
+            {% endif %}
+        }
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body, html {
+            width: 1080px;
+            height: {{ view_height }}px;
+            background-image: var(--bg-image);
+            background-size: cover;
+            background-position: center;
+            color: var(--text-main);
+            overflow: hidden;
+            font-family: 'Martel', serif;
+        }
+
+        .gradient-darken {
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at 30% 50%, transparent 10%, var(--overlay) 100%);
+            z-index: 5;
+        }
+
+        /* Character Box - Lowered for face visibility */
+        .character-box {
+            position: absolute;
+            bottom: 40px;
+            right: -50px;
+            width: 1100px;
+            height: 100%;
+            z-index: 10;
+            display: flex;
+            justify-content: flex-end;
+            align-items: flex-end;
+        }
+
+        .character-img {
+            max-width: 140%;
+            max-height: 85%;
+            filter: drop-shadow(-20px 0 40px rgba(0,0,0,0.8));
+        }
+
+        /* REFINED QUOTE PANEL */
+        .quote-panel {
+            position: relative;
+            z-index: 30;
+            width: 850px;
+            padding: 80px 100px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding-bottom: 150px; /* Reduced to push data up */
+        }
+
+        .quote-mark {
+            font-family: 'Playfair Display', serif;
+            font-style: italic;
+            font-weight: 900;
+            font-size: 220px; /* Sized down */
+            line-height: 0;
+            color: var(--primary);
+            opacity: 0.7;
+            margin-bottom: 60px;
+        }
+
+        .headline {
+            font-family: 'Playfair Display', serif;
+            font-weight: 900;
+            font-style: italic;
+            font-size: 60px; /* Scaled down for readability */
+            line-height: 1.25;
+            color: var(--text-main);
+            position: relative;
+            {% if heritage_mode == 'dark' %}
+            text-shadow: 10px 10px 40px rgba(0,0,0,1);
+            {% endif %}
+        }
+
+        .headline::before {
+            content: '';
+            position: absolute;
+            left: -40px;
+            top: 0;
+            width: 8px;
+            height: 100%;
+            background: var(--primary);
+        }
+
+        .character-name {
+            font-family: 'Anton', sans-serif;
+            font-size: 18px;
+            text-transform: uppercase;
+            letter-spacing: 6px;
+            color: var(--primary);
+            margin-bottom: 25px;
+        }
+
+        /* BRANDING - HORIZONTAL BOTTOM ROW */
+        .branding-row {
+            position: absolute;
+            bottom: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 25px;
+            z-index: 50;
+            background: var(--overlay);
+            padding: 20px 60px;
+            border-radius: 100px;
+            backdrop-filter: blur(10px);
+            border: 2px solid var(--primary);
+        }
+
+        .brand-logo {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            border: 3px solid var(--primary);
+        }
+
+        .brand-label {
+            font-family: 'Anton', sans-serif;
+            font-size: 18px;
+            text-transform: uppercase;
+            letter-spacing: 8px;
+            color: var(--primary);
+        }
+
+    </style>
+</head>
+<body>
+    <div class="gradient-darken"></div>
+
+    <div class="character-box">
+        {% if cutout_base64 %}
+            <img src="data:image/png;base64,{{ cutout_base64 }}" class="character-img" alt="Character">
+        {% else %}
+            <img src="{{ original_image }}" class="character-img" style="opacity: 0.4; filter: grayscale(1);" alt="Original">
+        {% endif %}
+    </div>
+
+    <div class="quote-panel">
+        <span class="character-name">{{ character_name }}</span>
+        <div class="quote-mark">“</div>
+        <h1 class="headline">{{ headline }}</h1>
+    </div>
+
+    <div class="branding-row">
+        {% if logo_base64 %}
+            <img src="data:image/png;base64,{{ logo_base64 }}" class="brand-logo" alt="Logo">
+        {% endif %}
+        <span class="brand-label">Humorously Indians</span>
+    </div>
+</body>
+</html>

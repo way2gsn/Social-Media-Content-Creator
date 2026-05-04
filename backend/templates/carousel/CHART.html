@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="base.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="slide-counter">DATA VISUALIZATION // {{ slide_index + 1 }}</div>
+        <h1 class="headline-main" style="font-size: 60px;">{{ headline }}</h1>
+        <hr class="h-rule">
+        
+        <div style="flex: 1; padding: 40px 0;">
+            <canvas id="myChart"></canvas>
+        </div>
+        
+        <p class="sub-headline" style="font-size: 18px;">[ Source Data: Official Records / 2026 ]</p>
+    </div>
+
+    <div class="footer">
+        <span>© 2026 HUMOROUSLY INDIANS</span>
+        <img src="/Volumes/Ghanshyam SSD1/Social Media Content Creator/Logo.png" class="brand-logo" alt="Logo">
+    </div>
+
+    <script>
+        const ctx = document.getElementById('myChart');
+        const data = {{ chart_data | safe }};
+        
+        // Minimalist Chart Styling
+        if (data.datasets) {
+            data.datasets.forEach(dataset => {
+                dataset.borderColor = '#000000';
+                dataset.backgroundColor = '#000000';
+                dataset.borderWidth = 3;
+                dataset.pointRadius = 4;
+            });
+        }
+
+        new Chart(ctx, {
+            type: '{{ chart_type }}' || 'line',
+            data: data,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { grid: { color: '#f0f0f0' }, ticks: { color: '#888888', font: { family: 'Inter' } } },
+                    x: { grid: { display: false }, ticks: { color: '#888888', font: { family: 'Inter' } } }
+                }
+            }
+        });
+    </script>
+</body>
+</html>

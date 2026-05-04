@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&family=Playfair+Display:ital,wght@0,700;0,900;1,700&display=swap');
+        
+        :root {
+            --accent: #e11d48; 
+            --bg: #000000;
+        }
+
+        .theme-TECH { --accent: #06b6d4; }
+        .theme-CULTURE { --accent: #f59e0b; }
+        .theme-CRIME { --accent: #991b1b; }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        html, body {
+            width: 1080px;
+            height: {{ view_height }}px;
+            background-color: var(--bg);
+            color: #fff;
+            font-family: 'Outfit', sans-serif;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* 1. Background Logic */
+        .background-layer {
+            position: absolute;
+            inset: 0;
+            z-index: 1;
+        }
+        .bg-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            filter: brightness(0.7);
+            transform: scale(1.02);
+        }
+
+        /* 3. Text Overlay */
+        .scrim-bottom {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 70%;
+            background: linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,0.85) 40%, rgba(0,0,0,0.4) 70%, transparent 100%);
+            z-index: 10;
+            display: flex;
+            align-items: flex-end;
+            padding: 100px 80px;
+        }
+
+        .content-bottom {
+            width: 100%;
+        }
+
+        .headline {
+            font-family: 'Playfair Display', serif;
+            font-size: 70px;
+            font-weight: 900;
+            line-height: 1.1;
+            text-transform: uppercase;
+            max-width: 95%;
+            text-shadow: 0 5px 30px rgba(0,0,0,0.8);
+        }
+
+        .headline .highlight {
+            color: var(--accent);
+        }
+
+        /* 4. Brand & Logo */
+        .brand-header {
+            position: absolute;
+            top: 60px;
+            right: 80px;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            gap: 25px;
+        }
+        
+        .logo-circle {
+            width: 110px;
+            height: 110px;
+            border-radius: 50%;
+            overflow: hidden;
+            background: #fff;
+        }
+        .logo-img { width: 100%; height: 100%; object-fit: cover; }
+
+        .brand-text {
+            font-weight: 900;
+            font-size: 18px;
+            text-transform: uppercase;
+            letter-spacing: 5px;
+            text-align: right;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+        }
+        .brand-text span { color: var(--accent); }
+
+        .category-tag {
+            color: var(--accent);
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 6px;
+            font-size: 16px;
+            margin-bottom: 25px;
+            display: block;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+        }
+        
+    </style>
+</head>
+<body class="theme-{{ theme }}">
+    <div class="background-layer">
+        {% if original_image %}
+        <img src="{{ original_image }}" class="bg-img">
+        {% endif %}
+    </div>
+
+    <div class="brand-header">
+        <div class="brand-text">Humorously<br>Indians<span>.</span></div>
+        <div class="logo-circle">
+            {% if logo_base64 %}
+            <img src="data:image/png;base64,{{ logo_base64 }}" class="logo-img">
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="scrim-bottom">
+        <div class="content-bottom">
+            <span class="category-tag">Insight Report // 01</span>
+            <h1 class="headline">{{ headline }}</h1>
+            <div style="font-weight: 900; color: var(--accent); letter-spacing: 12px; font-size: 14px; text-transform: uppercase; margin-top: 40px;">SWIPE FOR MORE</div>
+        </div>
+    </div>
+
+</body>
+</html>

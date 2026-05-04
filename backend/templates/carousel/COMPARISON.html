@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="base.css">
+</head>
+<body>
+    <div class="container">
+        <div class="slide-counter">ANALYSIS // {{ slide_index + 1 }}</div>
+        <h1 class="headline-main" style="font-size: 60px;">{{ headline }}</h1>
+        <hr class="h-rule">
+        
+        <div class="grid-2x2" style="grid-template-rows: 1fr;">
+            <div class="minimal-card">
+                <div class="metric-label">The Official Promise</div>
+                <div class="metric-value" style="font-size: 48px;">{{ promise_text }}</div>
+            </div>
+            <div class="minimal-card" style="border-color: var(--accent); border-width: 2px;">
+                <div class="metric-label" style="color: var(--accent);">The Actual Reality</div>
+                <div class="metric-value" style="font-size: 48px; color: var(--accent);">{{ result_text }}</div>
+            </div>
+        </div>
+        
+        <p class="sub-headline" style="margin-top: 40px;">
+            A direct contrast between projected milestones and empirical outcomes.
+        </p>
+    </div>
+
+    <div class="footer">
+        <span>© 2026 HUMOROUSLY INDIANS</span>
+        <img src="/Volumes/Ghanshyam SSD1/Social Media Content Creator/Logo.png" class="brand-logo" alt="Logo">
+    </div>
+</body>
+</html>

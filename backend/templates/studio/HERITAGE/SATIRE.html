@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@800;900&family=Inter:ital,wght@0,400;0,700;0,800;1,800&display=swap');
+        
+        :root {
+            --canvas-width: {{ width }}px;
+            --canvas-height: {{ height }}px;
+            
+            /* V5.0 Satire Palette */
+            {% if heritage_mode == 'light' %}
+            --gradient-start: rgba(255, 255, 255, 1);
+            --gradient-mid: rgba(255, 255, 255, 0.8);
+            --gradient-end: rgba(255, 255, 255, 0);
+            --accent: #b91c1c;
+            --text-main: #020617;
+            --heritage-bg: url('data:image/png;base64,{{ light_bg_base64 }}');
+            {% else %}
+            --gradient-start: rgba(2, 6, 23, 1);
+            --gradient-mid: rgba(2, 6, 23, 0.8);
+            --gradient-end: rgba(2, 6, 23, 0);
+            --accent: #f59e0b;
+            --text-main: #ffffff;
+            --heritage-bg: url('data:image/png;base64,{{ dark_bg_base64 }}');
+            {% endif %}
+        }
+
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body, html { 
+            width: var(--canvas-width); 
+            height: var(--canvas-height); 
+            overflow: hidden; 
+            background: #000;
+            font-family: 'Inter', sans-serif;
+            color: var(--text-main);
+            position: relative;
+        }
+
+        /* V5.0 Grayscale Immersive Background */
+        .hero-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 1;
+            filter: grayscale(1) contrast(1.2) brightness(0.7);
+        }
+
+        .heritage-texture {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: var(--heritage-bg);
+            background-size: cover;
+            background-position: center;
+            opacity: 0.1;
+            mix-blend-mode: overlay;
+            z-index: 2;
+        }
+
+        /* Heavy Satire Gradient */
+        .cinematic-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 70%;
+            background: linear-gradient(to top, var(--gradient-start) 20%, var(--gradient-mid) 50%, var(--gradient-end) 100%);
+            z-index: 10;
+        }
+
+        /* Content Layer */
+        .content-container {
+            position: absolute;
+            bottom: 80px;
+            left: 0;
+            width: 100%;
+            z-index: 20;
+            padding: 80px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Official Seal / Header */
+        .official-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .seal-pill {
+            background: var(--accent);
+            color: #fff;
+            padding: 10px 24px;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 5px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        .header-line { flex: 1; height: 1px; background: var(--accent); opacity: 0.5; }
+
+        .headline {
+            font-family: 'Outfit', sans-serif;
+            font-size: 110px; /* Massive Satire Impact */
+            font-weight: 900;
+            line-height: 0.85;
+            letter-spacing: -6px;
+            text-transform: uppercase;
+            font-style: italic;
+            color: var(--text-main);
+            margin-bottom: 30px;
+            filter: drop-shadow(0 10px 20px rgba(0,0,0,0.3));
+        }
+
+        .satire-pill {
+            width: fit-content;
+            background: transparent;
+            border: 3px solid var(--accent);
+            color: var(--accent);
+            padding: 18px 40px;
+            border-radius: 12px;
+            font-size: 28px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            transform: rotate(-1deg);
+        }
+
+        /* Branding Footer */
+        .branding-footer {
+            margin-top: 60px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+        .brand-group { display: flex; align-items: center; gap: 20px; }
+        .logo { height: 48px; border-radius: 50%; border: 2px solid var(--accent); }
+        .brand-name { font-weight: 900; text-transform: uppercase; font-size: 16px; letter-spacing: 1px; }
+        .memo-id { font-family: 'Inter'; font-weight: 800; font-size: 12px; opacity: 0.5; text-transform: uppercase; letter-spacing: 2px; }
+
+        /* V5.1 Subject Cutout Pop */
+        .subject-cutout {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 15;
+            object-fit: contain;
+            filter: drop-shadow(0 30px 60px rgba(0,0,0,0.8)) saturate(1.2);
+            pointer-events: none;
+            transform: translateY(20px);
+        }
+
+    </style>
+</head>
+<body>
+    {% if image_url %}
+    <img src="{{ image_url }}" class="hero-canvas">
+    {% else %}
+    <img src="https://loremflickr.com/1080/1920/india,government" class="hero-canvas">
+    {% endif %}
+    
+    <div class="heritage-texture"></div>
+    <div class="cinematic-overlay"></div>
+
+    {% if cutout_base64 %}
+    <img src="data:image/png;base64,{{ cutout_base64 }}" class="subject-cutout">
+    {% endif %}
+
+    <div class="content-container">
+        <div class="official-header">
+            <div class="seal-pill">Official Strategy</div>
+            <div class="header-line"></div>
+        </div>
+
+        <h1 class="headline">{{ headline }}</h1>
+        <div class="satire-pill">{{ subtext }}</div>
+
+        <div class="branding-footer">
+            <div class="brand-group">
+                <img src="data:image/png;base64,{{ logo_base64 }}" class="logo">
+                <span class="brand-name">Humorously Indians</span>
+            </div>
+            <div class="memo-id">MEMO: #{{ datetime.now().strftime('%Y%H%M') }}</div>
+        </div>
+    </div>
+</body>
+</html>

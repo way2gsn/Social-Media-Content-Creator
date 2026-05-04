@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@1,700&family=Syne:wght@800&family=Inter:wght@400;900&display=swap');
+        
+        :root {
+            --accent: #991b1b; /* Deep Crimson */
+            --bg: #000000;
+            --grid: rgba(153, 27, 27, 0.15);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        html, body {
+            width: 1080px;
+            height: {{ view_height }}px;
+            background-color: var(--bg);
+            color: #fff;
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+            position: relative;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* 1. Dramatic Background Layers */
+        .scenic-bg {
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+            object-fit: cover;
+            filter: grayscale(1) brightness(0.15) blur(10px);
+            opacity: 0.6;
+        }
+
+        .spotlight {
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at 65% 50%, rgba(153, 27, 27, 0.25) 0%, transparent 75%);
+            z-index: 1;
+        }
+
+        .geometry-overlay {
+            position: absolute;
+            inset: 0;
+            background-image: 
+                radial-gradient(var(--grid) 1.5px, transparent 1.5px);
+            background-size: 50px 50px;
+            opacity: 0.4;
+            z-index: 2;
+        }
+
+        /* 2. Character Cutout (Monochrome Power - Pre-Framed by Backend) */
+        .character-cutout {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            filter: grayscale(1) contrast(1.25) brightness(0.85) drop-shadow(-50px 0 100px rgba(0,0,0,1));
+        }
+
+        /* 3. Quote Panel (Centered Authority) */
+        .quote-panel {
+            position: absolute;
+            inset: 0;
+            padding: 130px;
+            z-index: 20;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            max-width: 880px;
+        }
+
+        .quote-mark {
+            font-size: 320px;
+            font-family: 'Syne', sans-serif;
+            color: var(--accent);
+            line-height: 0;
+            margin-bottom: 80px;
+            opacity: 0.9;
+            filter: drop-shadow(0 10px 20px rgba(153, 27, 27, 0.3));
+        }
+
+        .main-quote {
+            font-family: 'Lora', serif;
+            font-size: 76px;
+            font-weight: 700;
+            font-style: italic;
+            line-height: 1.1;
+            letter-spacing: -2.5px;
+            margin-bottom: 65px;
+            text-shadow: 0 15px 50px rgba(0,0,0,1);
+        }
+
+        .attribution-box {
+            display: flex;
+            align-items: center;
+            gap: 30px;
+        }
+
+        .dash {
+            width: 90px;
+            height: 10px;
+            background: var(--accent);
+            box-shadow: 0 0 15px rgba(153, 27, 27, 0.5);
+        }
+
+        .attribution {
+            font-family: 'Syne', sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 7px;
+            font-weight: 800;
+            font-size: 26px;
+            color: white;
+            text-shadow: 0 5px 15px rgba(0,0,0,0.5);
+        }
+
+        /* 4. Branding & Index (V4) */
+        .header-meta {
+            position: absolute;
+            top: 60px;
+            left: 60px;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .brand-logo {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            overflow: hidden;
+            border: 3px solid var(--accent);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+            object-fit: cover;
+        }
+
+        .index-tag {
+            font-family: 'Syne', sans-serif;
+            font-size: 20px;
+            letter-spacing: 4px;
+            color: var(--accent);
+            opacity: 0.8;
+            transform: translateY(2px);
+        }
+
+
+        .footer {
+            position: absolute;
+            top: 50%;
+            right: 40px;
+            transform: translateY(-50%) rotate(90deg);
+            transform-origin: center right;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            z-index: 30;
+            opacity: 0.8;
+            white-space: nowrap;
+        }
+
+        .brand-label {
+            font-family: 'Anton', sans-serif;
+            font-size: 14px;
+            font-weight: 400;
+            text-transform: uppercase;
+            letter-spacing: 7px;
+            color: #991b1b;
+        }
+    </style>
+</head>
+<body>
+    <div class="header-meta">
+        {% if logo_base64 %}
+        <img src="data:image/png;base64,{{ logo_base64 }}" class="brand-logo">
+        {% endif %}
+        <div class="index-tag">EDITORIAL // {{ slide_index }}</div>
+    </div>
+
+    {% if original_image %}
+    <img src="{{ original_image }}" class="scenic-bg">
+    {% endif %}
+    <div class="spotlight"></div>
+    <div class="geometry-overlay"></div>
+
+    {% if cutout_base64 %}
+    <img src="data:image/png;base64,{{ cutout_base64 }}" class="character-cutout">
+    {% elif silhouette %}
+    <div class="character-cutout" style="display: flex; align-items: flex-end; justify-content: center; filter: none;">
+        <svg width="700" height="1100" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="opacity: 0.8; transform: scaleX(-1);">
+            <path d="M12 12C14.21 12 16 10.21 16 8C16 5.79 14.21 4 12 4C9.79 4 8 5.79 8 8C8 10.21 9.79 12 12 12ZM12 14C9.33 14 4 15.34 4 18V20H20V18C20 15.34 14.67 14 12 14Z" fill="url(#grad2)"/>
+            <defs>
+                <linearGradient id="grad2" x1="12" y1="4" x2="12" y2="20" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#991b1b"/>
+                    <stop offset="1" stop-color="#000000"/>
+                </linearGradient>
+            </defs>
+        </svg>
+    </div>
+    {% elif original_image %}
+    <img src="{{ original_image }}" class="character-cutout" style="opacity: 0.3; filter: grayscale(1) blur(8px) contrast(1.4);">
+    {% endif %}
+
+    <div class="quote-panel">
+        <div class="quote-mark">“</div>
+        <h1 class="main-quote">{{ headline }}</h1>
+        <div class="attribution-box">
+            <div class="dash"></div>
+            <div class="attribution">{{ character_name }}</div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <span class="brand-label">Humorously Indians</span>
+    </div>
+</body>
+</html>

@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&family=Playfair+Display:ital,wght@0,700;1,700&display=swap');
+        
+        :root {
+            --accent: #e11d48; 
+            --bg: #05070a;
+        }
+
+        .theme-TECH { --accent: #06b6d4; --bg: #080a0f; }
+        .theme-CULTURE { --accent: #f59e0b; --bg: #0c0a09; }
+        .theme-CRIME { --accent: #991b1b; --bg: #050505; }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        html, body {
+            width: 1080px;
+            height: {{ view_height }}px;
+            background-color: var(--bg);
+            color: #fff;
+            font-family: 'Outfit', sans-serif;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* 1. Contextual Background (Subtle) */
+        .bg-canvas {
+            position: absolute;
+            inset: 0;
+            z-index: 1;
+        }
+        
+        .bg-image-subtle {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0.25; 
+            filter: brightness(0.6) blur(2px);
+        }
+
+        .accent-blob {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 900px;
+            height: 900px;
+            background: radial-gradient(circle, var(--accent) 0%, transparent 70%);
+            opacity: 0.15;
+            filter: blur(100px);
+        }
+
+        .dots {
+            position: absolute;
+            inset: 0;
+            background-image: radial-gradient(rgba(255,255,255,0.08) 1px, transparent 1px);
+            background-size: 40px 40px;
+            opacity: 0.4;
+        }
+
+        /* 2. Side Indicator */
+        .side-num {
+            position: absolute;
+            top: 50%;
+            left: -100px;
+            transform: translateY(-50%);
+            font-size: 800px;
+            font-weight: 900;
+            color: #fff;
+            opacity: 0.03;
+            line-height: 1;
+            font-family: 'Playfair Display', serif;
+        }
+
+        /* 3. Content */
+        .content {
+            position: relative;
+            z-index: 10;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 120px 100px;
+        }
+
+        .context-line {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            margin-bottom: 60px;
+        }
+        .line { flex: 1; height: 2px; background: linear-gradient(to right, var(--accent), transparent); }
+        .context-text {
+            font-weight: 900;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 5px;
+            color: var(--accent);
+        }
+
+        .point-container {
+            border-left: 10px solid var(--accent);
+            padding-left: 60px;
+        }
+
+        .point-text {
+            font-size: 58px;
+            line-height: 1.25;
+            font-weight: 700;
+            color: #fff;
+            max-width: 900px;
+            text-shadow: 0 5px 30px rgba(0,0,0,0.8);
+        }
+
+        /* 4. Footer Branding */
+        .footer {
+            position: absolute;
+            bottom: 80px;
+            left: 100px;
+            right: 100px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .logo-small {
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            background: #fff;
+            padding: 2px;
+        }
+        .logo-img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+
+        .slide-progress {
+            font-size: 15px;
+            font-weight: 900;
+            letter-spacing: 6px;
+            opacity: 0.6;
+            text-transform: uppercase;
+        }
+
+        .progress-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 12px;
+            background: var(--accent);
+            width: {{ (slide_index / total_slides) * 100 }}%;
+        }
+        
+    </style>
+</head>
+<body class="theme-{{ theme }}">
+    <div class="bg-canvas">
+        {% if original_image %}
+        <img src="{{ original_image }}" class="bg-image-subtle">
+        {% endif %}
+        <div class="accent-blob"></div>
+        <div class="dots"></div>
+    </div>
+    <div class="side-num">{{ slide_index }}</div>
+
+    <div class="content">
+        <div class="context-line">
+            <span class="context-text">Analysis Phase</span>
+            <div class="line"></div>
+        </div>
+
+        <div class="point-container">
+            <p class="point-text">{{ current_point }}</p>
+        </div>
+    </div>
+
+    <div class="footer">
+        <div class="slide-progress">Slide {{ slide_index }} / {{ total_slides }}</div>
+        <div class="logo-small">
+            {% if logo_base64 %}
+            <img src="data:image/png;base64,{{ logo_base64 }}" class="logo-img">
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="progress-bar"></div>
+</body>
+</html>

@@ -1,0 +1,107 @@
+async def perpetual_scheduler():
+    """Background loop to check for due posts and upload them."""
+    print("DEBUG: Scheduler worker started.")
+    while True:
+        try:
+            settings = DatabaseManager.get_settings()
+            mode = settings.get("scheduler_mode", "automation")
+            pending = DatabaseManager.get_pending_schedules()
+            
+            for task in pending:
+                try:
+                    print(f"DEBUG: Processing schedule {task['id']} for post {task['post_id']} (Mode: {mode})")
+                    DatabaseManager.update_schedule_status(task['id'], "uploading")
+                    
+                    success, msg = False, "Unknown Error"
+                    
+                    if mode == "api":
+                        token = settings.get("ig_access_token")
+                        biz_id = settings.get("ig_business_id")
+                        
+                        if not token or not biz_id:
+                            success, msg = False, "Missing Instagram API Token or Business ID"
+                        else:
+                            api_engine = InstagramAPIEngine(access_token=token, business_id=biz_id)
+                            
+                            # ─── CAROUSEL DETECTION ───
+                            is_carousel = "carousels/" in task['asset_path']
+                            
+                            if is_carousel:
+                                # 1. Find all slides in the folder
+                                folder_rel = os.path.dirname(task['asset_path'])
+                                folder_full = os.path.join(OUTPUT_DIR, folder_rel)
+                                
+                                slides = sorted([f for f in os.listdir(folder_full) if f.endswith(".png")])
+                                if not slides:
+                                    success, msg = False, "No slides found in carousel folder."
+                                else:
+                                    item_ids = []
+                                    print(f"DEBUG: Processing carousel with {len(slides)} slides.")
+                                    
+                                    for s in slides:
+                                        s_path = os.path.join(folder_full, s)
+                                        p_url, p_err = await api_engine.upload_to_proxy(s_path)
+                                        if not p_url:
+                                            msg = f"Slide Proxy Error: {p_err}"
+                                            break
+                                        
+                                        c_id, c_err = await api_engine.create_carousel_item_container(p_url)
+                                        if not c_id:
+                                            msg = f"Item Container Error: {c_err}"
+                                            break
+                                        
+                                        # Wait for item to be ready
+                                        ready, r_err = await api_engine.check_container_status(c_id)
+                                        if not ready:
+                                            msg = f"Item Ready Error: {r_err}"
+                                            break
+                                        
+                                        item_ids.append(c_id)
+                                    
+                                    if len(item_ids) == len(slides):
+                                        # Create master carousel container
+                                        master_id, m_err = await api_engine.create_carousel_container(item_ids, task['caption'])
+                                        if master_id:
+                                            ready, r_err = await api_engine.check_container_status(master_id)
+                                            if ready:
+                                                success, msg = await api_engine.publish_media(master_id)
+                                            else:
+                                                success, msg = False, f"Master Ready Error: {r_err}"
+                                        else:
+                                            success, msg = False, m_err
+                                    else:
+                                        success = False
+                                        # msg is already set in the loop
+                            else:
+                                # ─── SINGLE POST ───
+                                full_image_path = os.path.join(OUTPUT_DIR, task['asset_path'])
+                                public_image_url, p_msg = await api_engine.upload_to_proxy(full_image_path)
+                                
+                                if not public_image_url:
+                                    success, msg = False, f"Proxy Error: {p_msg}"
+                                else:
+                                    container_id, c_msg = await api_engine.create_media_container(public_image_url, task['caption'])
+                                    if container_id:
+                                        ready, r_msg = await api_engine.check_container_status(container_id)
+                                        if ready:
+                                            success, msg = await api_engine.publish_media(container_id)
+                                        else:
+                                            success, msg = False, r_msg
+                                    else:
+                                        success, msg = False, c_msg
+
+                    else:
+                        full_image_path = os.path.join(OUTPUT_DIR, task['asset_path'])
+                        success, msg = await uploader.upload_post(full_image_path, task['caption'])
+                    
+                    if success:
+                        DatabaseManager.update_schedule_status(task['id'], "completed")
+                    else:
+                        DatabaseManager.update_schedule_status(task['id'], "failed", msg)
+                except Exception as e:
+                    print(f"TASK ERROR: {e}")
+                    DatabaseManager.update_schedule_status(task['id'], "failed", str(e))
+        except Exception as e:
+            print(f"SCHEDULER LOOP ERROR: {e}")
+            
+        await asyncio.sleep(60)

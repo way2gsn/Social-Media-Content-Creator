@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="base.css">
+</head>
+<body>
+    <div class="container">
+        <div class="slide-counter">KEY INDICATORS // {{ slide_index + 1 }}</div>
+        <h1 class="headline-main" style="font-size: 60px;">{{ headline }}</h1>
+        <hr class="h-rule">
+        
+        <div class="grid-2x2">
+            {% for metric in metrics %}
+            <div class="minimal-card">
+                <div class="metric-label">{{ metric.label }}</div>
+                <div class="metric-value">{{ metric.value }}</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="footer">
+        <span>© 2026 HUMOROUSLY INDIANS</span>
+        <img src="/Volumes/Ghanshyam SSD1/Social Media Content Creator/Logo.png" class="brand-logo" alt="Logo">
+    </div>
+</body>
+</html>

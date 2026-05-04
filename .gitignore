@@ -1,0 +1,22 @@
+# Python
+backend/venv/
+backend/__pycache__/
+backend/*.pyc
+backend/key.json
+backend/automation.db
+.env
+
+# Node / Frontend
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# App Assets
+static/output/*
+!static/output/.gitkeep
