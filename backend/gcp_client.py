@@ -39,15 +39,21 @@ class GCPClient:
             self.key_data = json.load(f)
         
         self.project_id = self.key_data['project_id']
-        self.location = "asia-south1" # Locked to Mumbai for guaranteed stability
+        self.location = "asia-south1" # Fast text region
+        self.image_location = "us-central1" # Only region for Imagen
         self.credentials = service_account.Credentials.from_service_account_info(self.key_data)
         
-        print(f"GCP: Initializing in {self.location}...")
-        vertexai.init(project=self.project_id, location=self.location, credentials=self.credentials)
+        # 1. Initialize for Image (US) - Imagen ONLY lives in us-central1
+        print(f"GCP: Loading Image AI from us-central1...")
+        vertexai.init(project=self.project_id, location="us-central1", credentials=self.credentials)
+        from vertexai.preview.vision_models import ImageGenerationModel
+        self.image_model = ImageGenerationModel.from_pretrained("imagegeneration@006")
         
+        # 2. Initialize for Text (Mumbai) - Fast region for your location
+        print(f"GCP: Initializing Text AI in asia-south1...")
+        vertexai.init(project=self.project_id, location="asia-south1", credentials=self.credentials)
         self.text_model = GenerativeModel("gemini-1.5-flash")
         self.pro_model = GenerativeModel("gemini-1.5-pro")
-        self.image_model = ImageGenerationModel.from_pretrained("imagegeneration@006")
 
         self.initialized = True
 
