@@ -44,10 +44,10 @@ class GCPClient:
         self.credentials = service_account.Credentials.from_service_account_info(self.key_data)
         vertexai.init(project=self.project_id, location=self.location, credentials=self.credentials)
         
-        # Models
-        self.text_model = GenerativeModel("gemini-2.5-flash")
-        self.pro_model = GenerativeModel("gemini-2.5-pro")
-        self.image_model = ImageGenerationModel.from_pretrained("imagen-3.0-generate-001")
+        # Models - Updated to stable versions for production reliability
+        self.text_model = GenerativeModel("gemini-1.5-flash")
+        self.pro_model = GenerativeModel("gemini-1.5-pro")
+        self.image_model = ImageGenerationModel.from_pretrained("imagegeneration@006")
         
         self.initialized = True
 
@@ -102,8 +102,8 @@ class GCPClient:
                     number_of_images=1,
                     language="en",
                     aspect_ratio=target_ar,
-                    safety_filter_level="block_some",
-                    person_generation="allow_adult"
+                    safety_filter_level="block_only_high",
+                    person_generation="allow_all"
                 )
             )
             
