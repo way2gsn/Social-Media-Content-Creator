@@ -41,26 +41,29 @@ class GCPClient:
         self.project_id = self.key_data['project_id']
         self.credentials = service_account.Credentials.from_service_account_info(self.key_data)
         
-        # AUTO-REGION DETECTION: We will try regions until one works
+        # AUTO-REGION DETECTION: We will try regions with an ACTIVE ping test
         self.working_location = None
-        for loc in ["us-central1", "us-east4", "us-east1"]:
+        for loc in ["us-central1", "us-east4", "us-east1", "asia-south1"]:
             try:
+                print(f"GCP: Testing region {loc}...")
                 vertexai.init(project=self.project_id, location=loc, credentials=self.credentials)
                 test_model = GenerativeModel("gemini-1.5-flash")
-                # Quick check if it's available
-                self.location = loc
-                self.text_model = test_model
-                self.pro_model = GenerativeModel("gemini-1.5-pro")
-                self.image_model = ImageGenerationModel.from_pretrained("imagegeneration@006")
-                print(f"GCP: Successfully initialized in {loc}")
-                self.working_location = loc
-                break
+                # ACTIVE TEST: Actually try to generate one word
+                response = test_model.generate_content("hi", generation_config={"max_output_tokens": 1})
+                if response:
+                    self.location = loc
+                    self.text_model = test_model
+                    self.pro_model = GenerativeModel("gemini-1.5-pro")
+                    self.image_model = ImageGenerationModel.from_pretrained("imagegeneration@006")
+                    print(f"GCP: SUCCESS! Using {loc}")
+                    self.working_location = loc
+                    break
             except Exception as e:
-                print(f"GCP: {loc} not available, trying next...")
+                print(f"GCP: {loc} failed: {str(e)[:50]}...")
                 continue
         
         if not self.working_location:
-            # Fallback to us-central1 if all else fails
+            print("GCP CRITICAL: No regions available. Falling back to us-central1 defaults.")
             self.location = "us-central1"
             vertexai.init(project=self.project_id, location=self.location, credentials=self.credentials)
             self.text_model = GenerativeModel("gemini-1.5-flash")
