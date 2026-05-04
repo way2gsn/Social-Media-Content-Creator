@@ -3,8 +3,23 @@ import json
 import base64
 from google.oauth2 import service_account
 import vertexai
-from vertexai.generative_models import GenerativeModel, Part
-from vertexai.vision_models import ImageGenerationModel, Image as VertexImage
+
+# Smart Import for Vertex AI models (handles different library versions)
+try:
+    from vertexai.generative_models import GenerativeModel, Part
+except ImportError:
+    from vertexai.preview.generative_models import GenerativeModel, Part
+
+try:
+    from vertexai.vision_models import ImageGenerationModel, Image as VertexImage
+except ImportError:
+    try:
+        from vertexai.preview.vision_models import ImageGenerationModel, Image as VertexImage
+    except ImportError:
+        # Fallback placeholder if entirely missing (prevents crash)
+        ImageGenerationModel = None
+        VertexImage = None
+
 import io
 from PIL import Image
 
