@@ -285,18 +285,25 @@ export default function Home() {
             <button onClick={() => setSelectedPost(null)} className="absolute top-8 right-8 z-[110] p-3 bg-white/5 hover:bg-amber-500 hover:text-black rounded-full transition-all">
                 <Trash2 size={20} className="rotate-45"/>
             </button>
-            <div className="flex-1 bg-black flex items-center justify-center relative overflow-hidden group">
+                <div className="flex-1 bg-black flex items-center justify-center relative overflow-hidden group">
                   {selectedPost.asset_path.endsWith('.mp4') ? (
                     <video 
-                      src={selectedPost.asset_path.startsWith('http') ? selectedPost.asset_path : `${API}/static/output/${selectedPost.asset_path.replace('static/output/', '')}`} 
+                      src={selectedPost.asset_path.startsWith('http') ? selectedPost.asset_path : `${API}/static/output/${selectedPost.asset_path.replace('static/output/', '').replace(/^\/+/, '')}`} 
                       controls 
-                      className="w-full h-full object-cover" 
+                      className="max-h-full max-w-full object-contain" 
                     />
                   ) : (
                     <img 
-                      src={selectedPost.asset_path.startsWith('http') ? selectedPost.asset_path : `${API}/static/output/${selectedPost.asset_path.replace('static/output/', '')}`} 
+                      src={selectedPost.asset_path.startsWith('http') ? selectedPost.asset_path : `${API}/static/output/${selectedPost.asset_path.replace('static/output/', '').replace(/^\/+/, '')}`} 
                       alt={selectedPost.headline} 
-                      className="w-full h-full object-cover" 
+                      className="max-h-full max-w-full object-contain"
+                      onError={(e) => {
+                        // Final fallback for local development if the API prefix is causing issues
+                        const target = e.target as HTMLImageElement;
+                        if (!target.src.includes('localhost:3000')) {
+                           target.src = `/static/output/${selectedPost.asset_path.replace('static/output/', '').replace(/^\/+/, '')}`;
+                        }
+                      }}
                     />
                   )}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-8">
