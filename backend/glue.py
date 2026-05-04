@@ -496,11 +496,11 @@ class InstagramEngine:
                     datetime=datetime
                 )
                 
-                # Use networkidle to ensure images are fully loaded before screenshot
-                print(f"DEBUG: Rendering post with wait_until='networkidle' (Image size: {len(data.get('image_url', ''))//1024} KB)")
-                await page.set_content(html, wait_until='networkidle', timeout=90000)
-                # Extra buffer for cloud stability
-                await asyncio.sleep(2) 
+                # Use load + buffer for cloud stability (networkidle can hang on fonts/trackers)
+                print(f"DEBUG: Rendering post with wait_until='load' (Image type: {'Base64' if 'base64' in str(data.get('image_url','')) else 'URL/File'})")
+                await page.set_content(html, wait_until='load', timeout=60000)
+                # Fixed buffer for image painting
+                await asyncio.sleep(3) 
                 
                 output_path = os.path.join(OUTPUT_DIR, filename)
                 # Clip the screenshot to the exact dimensions of the aspect ratio
@@ -586,7 +586,23 @@ class InstagramEngine:
             else:
                 print(f"DEBUG: No image URL available for this post")
             
-            final_image_src = f"data:image/jpeg;base64,{image_base64}" if image_base64 else image_url
+            # Final Image Source Strategy:
+            # 1. Try Base64 (Most reliable for rendering)
+            # 2. Try Local File Path (Fail-safe for GCP permissions)
+            # 3. Fallback to raw URL
+            if image_base64:
+                final_image_src = f"data:image/jpeg;base64,{image_base64}"
+            elif image_url and image_url.startswith("/static/output/"):
+                # Convert relative static path to absolute file URL for Playwright
+                filename_only = os.path.basename(image_url)
+                abs_path = os.path.join(OUTPUT_DIR, filename_only)
+                final_image_src = f"file://{abs_path}"
+                print(f"DEBUG: Using file:// fallback for local asset: {final_image_src}")
+            else:
+                final_image_src = image_url or ""
+            
+            if not final_image_src:
+                print("DEBUG: CRITICAL - final_image_src is EMPTY. Background will be black.")
             
             # 3. Generate Deep Caption
             caption_data = await self.summarizer.generate_deep_caption(summary['headline'], summary['subtitle'], item['summary'])
