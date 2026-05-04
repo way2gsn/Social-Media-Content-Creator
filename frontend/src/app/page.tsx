@@ -285,13 +285,24 @@ export default function Home() {
             <button onClick={() => setSelectedPost(null)} className="absolute top-8 right-8 z-[110] p-3 bg-white/5 hover:bg-amber-500 hover:text-black rounded-full transition-all">
                 <Trash2 size={20} className="rotate-45"/>
             </button>
-            <div className="w-1/2 bg-black flex items-center justify-center">
-              {selectedPost.asset_path.endsWith('.mp4') ? (
-                <video src={`${API}/static/output/${selectedPost.asset_path}`} controls autoPlay loop className="max-h-full max-w-full"/>
-              ) : (
-                <img src={`${API}/static/output/${selectedPost.asset_path}`} className="max-h-full max-w-full object-contain" alt={selectedPost.headline}/>
-              )}
-            </div>
+            <div className="flex-1 bg-black flex items-center justify-center relative overflow-hidden group">
+                  {selectedPost.asset_path.endsWith('.mp4') ? (
+                    <video 
+                      src={selectedPost.asset_path.startsWith('http') ? selectedPost.asset_path : `${API}/static/output/${selectedPost.asset_path.replace('static/output/', '')}`} 
+                      controls 
+                      className="w-full h-full object-cover" 
+                    />
+                  ) : (
+                    <img 
+                      src={selectedPost.asset_path.startsWith('http') ? selectedPost.asset_path : `${API}/static/output/${selectedPost.asset_path.replace('static/output/', '')}`} 
+                      alt={selectedPost.headline} 
+                      className="w-full h-full object-cover" 
+                    />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-8">
+                    <p className="text-white/60 text-[10px] font-mono tracking-tighter truncate">{selectedPost.asset_path}</p>
+                  </div>
+                </div>
             <div className="w-1/2 p-12 flex flex-col overflow-y-auto custom-scrollbar">
               <div className="mb-8">
                   <p className="text-[10px] uppercase font-black text-amber-500 tracking-[0.3em] mb-2">{selectedPost.topic}</p>
