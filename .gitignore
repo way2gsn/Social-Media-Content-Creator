@@ -20,3 +20,5 @@ Thumbs.db
 # App Assets
 static/output/*
 !static/output/.gitkeep
+backend/user_data/
+npm-debug.log*
