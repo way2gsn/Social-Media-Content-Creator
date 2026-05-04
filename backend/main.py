@@ -34,7 +34,7 @@ app.add_middleware(
 
 # Absolute Paths for robust container execution
 BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
-STATIC_DIR = os.path.join(os.path.dirname(BACKEND_DIR), "static")
+STATIC_DIR = os.path.join(BACKEND_DIR, "static")
 os.makedirs(os.path.join(STATIC_DIR, "output"), exist_ok=True)
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
