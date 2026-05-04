@@ -39,7 +39,7 @@ class GCPClient:
             self.key_data = json.load(f)
         
         self.project_id = self.key_data['project_id']
-        self.location = "us-central1" # Default Vertex AI location
+        self.location = "us-east4" # Switched from us-central1 for better availability
         
         self.credentials = service_account.Credentials.from_service_account_info(self.key_data)
         vertexai.init(project=self.project_id, location=self.location, credentials=self.credentials)
