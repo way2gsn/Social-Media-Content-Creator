@@ -340,17 +340,21 @@ export default function Home() {
             </div>
           </div>
         </div>
-      )}
-
-      {/* ── SETTINGS MODAL ── */}
-      {isSettingsOpen && (
+           {isSettingsOpen && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center p-6 bg-black/90 backdrop-blur-xl animate-in fade-in duration-200">
           <div className="w-full max-w-lg bg-[#0d1117] rounded-[40px] border border-white/10 shadow-2xl overflow-hidden">
             <div className="p-10 border-b border-white/5 flex justify-between items-center">
-              <div><h3 className="text-2xl font-black text-white uppercase italic tracking-tighter">Settings</h3><p className="text-xs text-slate-500 mt-1 uppercase tracking-widest font-bold">Content Engine</p></div>
-              <button onClick={()=>setIsSettingsOpen(false)} className="text-slate-500 hover:text-white p-2"><AlertCircle size={24} className="rotate-45"/></button>
+              <div>
+                <h3 className="text-2xl font-black text-white uppercase italic tracking-tighter">Settings</h3>
+                <p className="text-xs text-slate-500 mt-1 uppercase tracking-widest font-bold">Content Engine</p>
+              </div>
+              <button onClick={()=>setIsSettingsOpen(false)} className="text-slate-500 hover:text-white p-2">
+                <AlertCircle size={24} className="rotate-45"/>
+              </button>
             </div>
+            
             <div className="p-10 space-y-8">
+              {/* Content Engine Switches */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between p-4 bg-black/20 rounded-xl border border-white/5">
                   <div>
@@ -373,50 +377,60 @@ export default function Home() {
                     <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${settings.full_auto === 'true' ? 'left-7' : 'left-1'}`}/>
                   </button>
                 </div>
-
-                {settings.use_music === 'true' && settings.available_tracks && (
-                  <div className="space-y-4">
-                    <div className="p-4 bg-black/20 rounded-xl border border-white/5">
-                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">Select Default Track</p>
-                      <select value={settings.default_track} onChange={e => saveSettings({default_track: e.target.value})}
-                        className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-xs text-white focus:outline-none">
-                        {settings.available_tracks?.map((t:string) => <option key={t} value={t}>{t}</option>)}
-                      </select>
-                    </div>
-
-                    <div className="p-4 bg-black/20 rounded-xl border border-white/5">
-                      <div className="flex justify-between items-center mb-4">
-                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Audio Library</p>
-                        <label className={`cursor-pointer text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg transition-all ${isUploading ? 'bg-white/5 text-slate-600' : 'bg-amber-500 text-black hover:bg-amber-400'}`}>
-                          {isUploading ? 'Uploading...' : 'Upload MP3'}
-                          <input type="file" accept=".mp3,.wav,.m4a" className="hidden" onChange={handleAudioUpload} disabled={isUploading}/>
-                        </label>
-                      </div>
-                      <div className="space-y-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
-                        {settings.available_tracks?.map((t:string) => (
-                          <div key={t} className="flex justify-between items-center p-2 rounded-lg bg-white/5 group">
-                            <span className="text-[10px] text-slate-400 truncate pr-4">{t}</span>
-                            <button onClick={() => deleteAudio(t)} className="text-slate-600 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 p-1">
-                              <AlertCircle size={14} className="rotate-45"/>
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
 
+              {/* Instagram API Tokens */}
               <div className="space-y-4">
-                <p className="text-[10px] font-bold text-slate-600 uppercase tracking-[0.25em] mb-2">Instagram API</p>
-                <input type="text" placeholder="Access Token" value={settings.ig_access_token || ''} onChange={e=>saveSettings({ig_access_token: e.target.value})}
-                  className="w-full bg-black/40 border border-white/5 rounded-xl p-4 text-xs text-white placeholder:text-slate-700 focus:outline-none focus:border-amber-500/50 transition-all"/>
-                <input type="text" placeholder="Business ID" value={settings.ig_business_id || ''} onChange={e=>saveSettings({ig_business_id: e.target.value})}
-                  className="w-full bg-black/40 border border-white/5 rounded-xl p-4 text-xs text-white placeholder:text-slate-700 focus:outline-none focus:border-amber-500/50 transition-all"/>
+                <p className="text-[10px] font-bold text-slate-600 uppercase tracking-[0.25em] mb-2">Instagram API Credentials</p>
+                <div className="space-y-3">
+                  <input 
+                    type="text" 
+                    placeholder="Access Token" 
+                    value={settings.ig_access_token || ''} 
+                    onChange={e => setSettings({...settings, ig_access_token: e.target.value})}
+                    className="w-full bg-black/40 border border-white/5 rounded-xl p-4 text-xs text-white placeholder:text-slate-700 focus:outline-none focus:border-amber-500/50 transition-all"
+                  />
+                  <input 
+                    type="text" 
+                    placeholder="Business ID" 
+                    value={settings.ig_business_id || ''} 
+                    onChange={e => setSettings({...settings, ig_business_id: e.target.value})}
+                    className="w-full bg-black/40 border border-white/5 rounded-xl p-4 text-xs text-white placeholder:text-slate-700 focus:outline-none focus:border-amber-500/50 transition-all"
+                  />
+                </div>
               </div>
+
+              {/* Audio Library (Optional) */}
+              {settings.use_music === 'true' && (
+                <div className="p-4 bg-black/20 rounded-xl border border-white/5">
+                  <div className="flex justify-between items-center mb-4">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Audio Library</p>
+                    <label className={`cursor-pointer text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg transition-all ${isUploading ? 'bg-white/5 text-slate-600' : 'bg-amber-500 text-black hover:bg-amber-400'}`}>
+                      {isUploading ? 'Uploading...' : 'Upload MP3'}
+                      <input type="file" accept=".mp3,.wav,.m4a" className="hidden" onChange={handleAudioUpload} disabled={isUploading}/>
+                    </label>
+                  </div>
+                  <div className="space-y-2 max-h-32 overflow-y-auto pr-2 custom-scrollbar">
+                    {settings.available_tracks?.map((t:string) => (
+                      <div key={t} className="flex justify-between items-center p-2 rounded-lg bg-white/5 group">
+                        <span className="text-[10px] text-slate-400 truncate pr-4">{t}</span>
+                        <button onClick={() => deleteAudio(t)} className="text-slate-600 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 p-1">
+                          <AlertCircle size={14} className="rotate-45"/>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
+
             <div className="p-10 pt-0">
-               <button onClick={()=>setIsSettingsOpen(false)} className="w-full py-4 bg-white/5 text-slate-400 font-bold uppercase tracking-widest text-[10px] rounded-xl hover:bg-white/10 transition-all border border-white/5">Close & Save</button>
+               <button 
+                 onClick={() => saveSettings(settings)} 
+                 className="w-full py-4 bg-amber-500 text-black font-black uppercase tracking-widest text-xs rounded-xl hover:bg-amber-400 transition-all shadow-[0_0_20px_rgba(245,158,11,0.3)]"
+               >
+                 {isSaving ? 'Saving to Cloud...' : 'Confirm & Save to Cloud'}
+               </button>
             </div>
           </div>
         </div>
