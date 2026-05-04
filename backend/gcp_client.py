@@ -83,12 +83,22 @@ class GCPClient:
         try:
             # Running in thread since vertexai is blocking
             import asyncio
+            import re
             loop = asyncio.get_event_loop()
             response = await loop.run_in_executor(
                 None, 
                 lambda: model.generate_content(full_prompt, generation_config=config)
             )
-            return response.text
+            text = response.text
+            
+            # gemini-2.5-flash wraps JSON in markdown code fences — strip them
+            if text and json_mode:
+                # Remove ```json ... ``` or ``` ... ``` wrappers
+                cleaned = re.sub(r'^```(?:json)?\s*\n?', '', text.strip())
+                cleaned = re.sub(r'\n?```\s*$', '', cleaned)
+                return cleaned.strip()
+            
+            return text
         except Exception as e:
             print(f"GCP Text Error: {e}")
             return None
