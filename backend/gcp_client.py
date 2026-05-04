@@ -62,8 +62,7 @@ class GCPClient:
             "max_output_tokens": 2048,
         }
         
-        if json_mode:
-            config["response_mime_type"] = "application/json"
+        # config["response_mime_type"] = "application/json" removed for compatibility with older SDK versions
 
         # Note: In vertexai, system_instruction is passed during model initialization 
         # but for simplicity here we prepend it if provided
