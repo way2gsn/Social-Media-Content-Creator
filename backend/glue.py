@@ -17,7 +17,11 @@ import io
 from gcp_client import get_gcp_client
 # Constants
 BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
-ROOT_DIR = os.path.dirname(BACKEND_DIR)
+# Docker Check: If we are in /app, the root is also /app
+if BACKEND_DIR == "/app":
+    ROOT_DIR = "/app"
+else:
+    ROOT_DIR = os.path.dirname(BACKEND_DIR)
 
 GCP_KEY_PATH = os.path.join(BACKEND_DIR, "key.json")
 STATIC_DIR = os.path.join(ROOT_DIR, "static")
