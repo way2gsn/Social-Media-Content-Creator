@@ -22,17 +22,28 @@
             position: relative;
         }
 
-        /* Full-Bleed Hero Image */
+        /* Full-Bleed Hero Image — two-layer: blurred bg + sharp foreground */
         .hero {
             position: absolute;
             inset: 0;
             z-index: 1;
         }
-        .hero-img {
+        .hero-bg {
+            position: absolute;
+            inset: 0;
             width: 100%;
             height: 100%;
             object-fit: cover;
-            filter: brightness(0.8);
+            filter: blur(30px) brightness(0.5);
+            transform: scale(1.15);
+        }
+        .hero-img {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            filter: brightness(0.85);
+            z-index: 2;
         }
 
         /* Cinematic Bottom Gradient */
@@ -139,6 +150,7 @@
 <body>
     <div class="hero">
         {% if image_url %}
+        <img src="{{ image_url }}" class="hero-bg">
         <img src="{{ image_url }}" class="hero-img">
         {% endif %}
     </div>

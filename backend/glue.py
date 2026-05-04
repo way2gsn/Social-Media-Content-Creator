@@ -530,14 +530,27 @@ class InstagramEngine:
                         if os.path.exists(local_path):
                             with open(local_path, "rb") as f:
                                 image_base64 = base64.b64encode(f.read()).decode()
+                            print(f"DEBUG: Local image loaded OK ({len(image_base64)//1024}KB)")
+                        else:
+                            print(f"DEBUG: Local image NOT FOUND: {local_path}")
                     else:
-                        headers = {"User-Agent": "Mozilla/5.0", "Accept": "image/*,*/*;q=0.8", "Referer": "https://www.google.com/"}
+                        headers = {
+                            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                            "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+                            "Referer": "https://www.google.com/",
+                            "Accept-Language": "en-US,en;q=0.9"
+                        }
                         async with httpx.AsyncClient(timeout=20.0, headers=headers, follow_redirects=True) as dl:
                             resp = await dl.get(image_url)
-                            if resp.status_code == 200 and len(resp.content) > 5000:
+                            if resp.status_code == 200 and len(resp.content) > 1000:
                                 image_base64 = base64.b64encode(resp.content).decode()
+                                print(f"DEBUG: Web image downloaded OK ({len(resp.content)//1024}KB)")
+                            else:
+                                print(f"DEBUG: Web image FAILED: status={resp.status_code}, size={len(resp.content)} bytes, url={image_url[:80]}")
                 except Exception as e:
                     print(f"DEBUG: Image base64 conversion failed: {e}")
+            else:
+                print(f"DEBUG: No image URL available for this post")
             
             final_image_src = f"data:image/jpeg;base64,{image_base64}" if image_base64 else image_url
             
