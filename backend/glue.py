@@ -213,8 +213,12 @@ class AISummarizer:
         result = await self.client.generate_text(prompt)
         try:
             data = json.loads(result)
-            return data.get('query', title), data.get('visual_ideal', title), data.get('protagonist', ""), data.get('imagen_prompt', title)
-        except: return title, title, "", title
+            prompt = data.get('imagen_prompt', title)
+            # Force centered composition for better framing
+            if "centered" not in prompt.lower():
+                prompt += ", centered composition, subject in center of frame"
+            return data.get('query', title), data.get('visual_ideal', title), data.get('protagonist', ""), prompt
+        except: return title, title, "", f"{title}, centered composition"
 
     async def generate_satire(self, topic, news_context="", language="english"):
         lang_instruction = f"OUTPUT LANGUAGE: {language}"
@@ -549,11 +553,23 @@ class InstagramEngine:
                         }
                         async with httpx.AsyncClient(timeout=20.0, headers=headers, follow_redirects=True) as dl:
                             resp = await dl.get(image_url)
-                            if resp.status_code == 200 and len(resp.content) > 1000:
+                            # Quality Check: Minimum 40KB for web images, otherwise it's likely a thumbnail
+                            if resp.status_code == 200 and len(resp.content) > 40000:
                                 image_base64 = base64.b64encode(resp.content).decode()
-                                print(f"DEBUG: Web image downloaded OK ({len(resp.content)//1024}KB)")
+                                print(f"DEBUG: High-Quality Web image downloaded OK ({len(resp.content)//1024}KB)")
                             else:
-                                print(f"DEBUG: Web image FAILED: status={resp.status_code}, size={len(resp.content)} bytes, url={image_url[:80]}")
+                                reason = "Too Small" if len(resp.content) <= 40000 else f"Status {resp.status_code}"
+                                print(f"DEBUG: Web image REJECTED ({reason}): size={len(resp.content)} bytes. Triggering AI Fallback.")
+                                # Trigger AI Fallback because web image is low quality
+                                print(f"DEBUG: Generating HD AI alternative for low-quality source...")
+                                img_bytes = await self.summarizer.client.generate_image(imagen_prompt, aspect_ratio="4:5")
+                                if img_bytes:
+                                    imagen_filename = f"imagen_hd_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+                                    with open(os.path.join(OUTPUT_DIR, imagen_filename), "wb") as f:
+                                        f.write(img_bytes)
+                                    image_base64 = base64.b64encode(img_bytes).decode()
+                                    is_ai_image = True
+                                    print(f"DEBUG: HD AI Replacement Generated OK ({len(img_bytes)//1024}KB)")
                 except Exception as e:
                     print(f"DEBUG: Image base64 conversion failed: {e}")
             else:
