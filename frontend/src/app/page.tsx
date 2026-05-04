@@ -40,18 +40,24 @@ export default function Home() {
   const fetchSettings = async () => { try { const r = await fetch(`${API}/settings`); setSettings(await r.json()); } catch {} };
   const fetchSchedules = async () => { try { const r = await fetch(`${API}/schedules`); const d = await r.json(); setSchedules(d.schedules || []); } catch {} };
 
-  const saveSettings = async (s: any) => {
+  const saveSettings = async (newSettings: any) => {
     setIsSaving(true);
-    const newSettings = {...settings, ...s};
-    try { 
-      await fetch(`${API}/settings`, { 
-        method: 'POST', 
-        headers: {'Content-Type':'application/json'}, 
-        body: JSON.stringify(newSettings) 
-      }); 
-      setSettings(newSettings); 
-    } catch {}
-    setIsSaving(false);
+    try {
+      const merged = { ...settings, ...newSettings };
+      const r = await fetch(`${API}/settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(merged)
+      });
+      if (r.ok) {
+        setSettings(merged);
+        setIsSettingsOpen(false);
+      }
+    } catch (err) {
+      console.error("Save failed:", err);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleAudioUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
