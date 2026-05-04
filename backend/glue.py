@@ -512,14 +512,18 @@ class InstagramEngine:
                     image_url = search_results[0]
                 else:
                     # GCP FALLBACK: Imagen 3 — triggers "dramatic" mode
-                    print(f"DEBUG: No web image found. Generating dramatic AI image.")
+                    print(f"DEBUG: No web image found. Generating dramatic AI image with Imagen 3...")
                     img_bytes = await self.summarizer.client.generate_image(imagen_prompt, aspect_ratio="4:5")
                     if img_bytes:
                         imagen_filename = f"imagen_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
-                        with open(os.path.join(OUTPUT_DIR, imagen_filename), "wb") as f:
+                        save_path = os.path.join(OUTPUT_DIR, imagen_filename)
+                        with open(save_path, "wb") as f:
                             f.write(img_bytes)
                         image_url = f"/static/output/{imagen_filename}"
                         is_ai_image = True
+                        print(f"DEBUG: AI Image Generated OK ({len(img_bytes)//1024}KB) -> {imagen_filename}")
+                    else:
+                        print("DEBUG: AI Image Generation FAILED (Empty Bytes)")
         
             # 2b. Convert image to base64 for reliable Playwright rendering
             image_base64 = None

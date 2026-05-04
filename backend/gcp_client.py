@@ -49,12 +49,12 @@ class GCPClient:
             self.text_model = GenerativeModel("gemini-2.5-flash")
             self.pro_model = GenerativeModel("gemini-2.5-flash") # Use same for pro
             
-            # Load image model with a separate fallback
+            # Load image model — imagen-3.0-generate-002 (imagegeneration@006 is EOL)
             try:
-                self.image_model = ImageGenerationModel.from_pretrained("imagegeneration@006")
+                self.image_model = ImageGenerationModel.from_pretrained("imagen-3.0-generate-002")
             except Exception as img_err:
-                print(f"GCP: Image model loading failed, using fallback @005: {img_err}")
-                self.image_model = ImageGenerationModel.from_pretrained("imagegeneration@005")
+                print(f"GCP: imagen-3.0-generate-002 failed, trying fallback: {img_err}")
+                self.image_model = ImageGenerationModel.from_pretrained("imagen-3.0-fast-generate-001")
             
             print("GCP: Vertex AI fully UNLOCKED.")
         except Exception as e:
