@@ -7,6 +7,7 @@ services:
       - ./static:/app/static
       - ./backend/automation.db:/app/automation.db
       - ./backend/key.json:/app/key.json
+      - ./Logo.png:/app/Logo.png
     restart: always
     environment:
       - PYTHONUNBUFFERED=1

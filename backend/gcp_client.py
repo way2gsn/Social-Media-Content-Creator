@@ -89,19 +89,20 @@ class GCPClient:
                 None, 
                 lambda: model.generate_content(full_prompt, generation_config=config)
             )
-            text = response.text
+            text = response.text if response and hasattr(response, 'text') else ""
             
             # gemini-2.5-flash wraps JSON in markdown code fences — strip them
             if text and json_mode:
+                text_content = text.strip()
                 # Remove ```json ... ``` or ``` ... ``` wrappers
-                cleaned = re.sub(r'^```(?:json)?\s*\n?', '', text.strip())
+                cleaned = re.sub(r'^```(?:json)?\s*\n?', '', text_content)
                 cleaned = re.sub(r'\n?```\s*$', '', cleaned)
                 return cleaned.strip()
             
-            return text
+            return text if text else ""
         except Exception as e:
             print(f"GCP Text Error: {e}")
-            return None
+            return ""
 
     async def generate_image(self, prompt, aspect_ratio="9:16"):
         """Generates an image using Imagen 3."""
@@ -110,22 +111,38 @@ class GCPClient:
             loop = asyncio.get_event_loop()
             
             # Aspect ratio mapping for Imagen
-            # Imagen 3 supports "1:1", "9:16", "16:9", "4:3", "3:4"
             ar_map = {"9:16": "9:16", "4:5": "3:4", "1:1": "1:1"}
             target_ar = ar_map.get(aspect_ratio, "9:16")
 
-            response = await loop.run_in_executor(
-                None,
-                lambda: self.image_model.generate_images(
-                    prompt=prompt,
-                    number_of_images=1,
-                    language="en",
-                    aspect_ratio=target_ar,
-                    safety_filter_level="block_only_high",
-                    person_generation="allow_all"
+            async def _do_gen(ar_val):
+                return await loop.run_in_executor(
+                    None,
+                    lambda: self.image_model.generate_images(
+                        prompt=prompt,
+                        number_of_images=1,
+                        language="en",
+                        aspect_ratio=ar_val,
+                        safety_filter_level="block_only_high",
+                        person_generation="allow_all"
+                    )
                 )
-            )
-            
+
+            try:
+                response = await _do_gen(target_ar)
+            except TypeError as te:
+                if "aspect_ratio" in str(te):
+                    print(f"DEBUG: SDK doesn't support aspect_ratio. Retrying without it...")
+                    # Fallback for older SDKs
+                    response = await loop.run_in_executor(
+                        None,
+                        lambda: self.image_model.generate_images(
+                            prompt=prompt,
+                            number_of_images=1,
+                            language="en"
+                        )
+                    )
+                else: raise te
+
             if response and response.images:
                 # Get image bytes
                 img_bytes = response.images[0]._image_bytes
