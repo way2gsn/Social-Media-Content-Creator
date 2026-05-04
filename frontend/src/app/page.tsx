@@ -340,7 +340,9 @@ export default function Home() {
             </div>
           </div>
         </div>
-           {isSettingsOpen && (
+      )}
+      
+      {isSettingsOpen && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center p-6 bg-black/90 backdrop-blur-xl animate-in fade-in duration-200">
           <div className="w-full max-w-lg bg-[#0d1117] rounded-[40px] border border-white/10 shadow-2xl overflow-hidden">
             <div className="p-10 border-b border-white/5 flex justify-between items-center">
