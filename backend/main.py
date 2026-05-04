@@ -32,8 +32,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-os.makedirs("../static/output", exist_ok=True)
-app.mount("/static", StaticFiles(directory="../static"), name="static")
+# Absolute Paths for robust container execution
+BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+STATIC_DIR = os.path.join(os.path.dirname(BACKEND_DIR), "static")
+os.makedirs(os.path.join(STATIC_DIR, "output"), exist_ok=True)
+
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 tasks = {}
 engine = InstagramEngine()
