@@ -231,6 +231,7 @@ async def generate_carousel_endpoint(topics: str = Form(...), count: int = Form(
 @app.delete("/delete_post/{post_id}")
 async def delete_post(post_id: int):
     try:
+        print(f"DEBUG: Attempting to delete post ID {post_id}")
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         
@@ -243,15 +244,18 @@ async def delete_post(post_id: int):
             full_path = os.path.join(STATIC_DIR, "output", os.path.basename(asset_path))
             if os.path.exists(full_path):
                 os.remove(full_path)
-                print(f"DEBUG: Deleted file {full_path}")
+                print(f"DEBUG: Deleted physical file {full_path}")
         
         # Delete from DB
         c.execute("DELETE FROM posts WHERE id = ?", (post_id,))
-        c.execute("DELETE FROM schedule WHERE post_id = ?", (post_id,))
+        # FIX: Table name is 'schedules' (plural)
+        c.execute("DELETE FROM schedules WHERE post_id = ?", (post_id,))
         conn.commit()
         conn.close()
+        print(f"DEBUG: Successfully deleted post {post_id} from database")
         return {"status": "success"}
     except Exception as e:
+        print(f"ERROR: Delete post failed: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
 
 @app.get("/task/{task_id}")

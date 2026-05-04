@@ -114,6 +114,9 @@ export default function Home() {
       if (res.ok) {
         fetchGallery();
         setSelectedPost(null);
+      } else {
+        const errorData = await res.json();
+        alert(`Delete failed: ${errorData.error || 'Unknown error'}`);
       }
     } catch (err) {
       console.error("Delete failed", err);
