@@ -165,32 +165,6 @@ async def perpetual_scheduler():
                                             success, msg = False, r_msg
                                     else:
                                         success, msg = False, c_msg
-@app.delete("/delete_post/{post_id}")
-async def delete_post(post_id: int):
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-        
-        # Get asset path first to delete file
-        c.execute("SELECT asset_path FROM posts WHERE id = ?", (post_id,))
-        row = c.fetchone()
-        if row:
-            asset_path = row[0]
-            # Delete from static folder
-            full_path = os.path.join(STATIC_DIR, "output", os.path.basename(asset_path))
-            if os.path.exists(full_path):
-                os.remove(full_path)
-                print(f"DEBUG: Deleted file {full_path}")
-        
-        # Delete from DB
-        c.execute("DELETE FROM posts WHERE id = ?", (post_id,))
-        c.execute("DELETE FROM schedule WHERE post_id = ?", (post_id,))
-        conn.commit()
-        conn.close()
-        return {"status": "success"}
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
                     else:
                         full_image_path = os.path.join(OUTPUT_DIR, task['asset_path'])
                         success, msg = await uploader.upload_post(full_image_path, task['caption'])
@@ -253,6 +227,32 @@ async def generate_carousel_endpoint(topics: str = Form(...), count: int = Form(
     }
     background_tasks.add_task(run_carousel_generation, task_id, topic_list, language, count)
     return {"task_id": task_id}
+
+@app.delete("/delete_post/{post_id}")
+async def delete_post(post_id: int):
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        
+        # Get asset path first to delete file
+        c.execute("SELECT asset_path FROM posts WHERE id = ?", (post_id,))
+        row = c.fetchone()
+        if row:
+            asset_path = row[0]
+            # Delete from static folder
+            full_path = os.path.join(STATIC_DIR, "output", os.path.basename(asset_path))
+            if os.path.exists(full_path):
+                os.remove(full_path)
+                print(f"DEBUG: Deleted file {full_path}")
+        
+        # Delete from DB
+        c.execute("DELETE FROM posts WHERE id = ?", (post_id,))
+        c.execute("DELETE FROM schedule WHERE post_id = ?", (post_id,))
+        conn.commit()
+        conn.close()
+        return {"status": "success"}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
 @app.get("/task/{task_id}")
 async def get_task_status(task_id: str):
