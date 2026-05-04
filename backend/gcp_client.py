@@ -3,7 +3,7 @@ import json
 import base64
 from google.oauth2 import service_account
 import vertexai
-from vertexai.generative_models import GenerativeModel, Part, SafetySetting
+from vertexai.generative_models import GenerativeModel, Part
 from vertexai.vision_models import ImageGenerationModel, Image as VertexImage
 import io
 from PIL import Image
