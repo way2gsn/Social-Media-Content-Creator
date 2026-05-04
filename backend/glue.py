@@ -464,39 +464,46 @@ class InstagramEngine:
             print(f"Cutout processing error: {e}")
         return None
     async def render_post(self, data, template_str, filename, width=1080, height=1920):
-        async with async_playwright() as p:
-            browser = await p.chromium.launch()
-            # Set the viewport to match the requested aspect ratio
-            context = await browser.new_context(viewport={'width': width, 'height': height})
-            page = await context.new_page()
-            
-            # Render the HTML with dynamic dimensions and BGs
-            html = Template(template_str).render(
-                **data,
-                logo_base64=self.logo_base64,
-                width=width,
-                height=height,
-                datetime=datetime
-            )
-            
-            await page.set_content(html, wait_until='domcontentloaded', timeout=60000)
-            # Wait for any external assets (like Google Fonts or web images) to load
-            await asyncio.sleep(3) 
-            
-            output_path = os.path.join(OUTPUT_DIR, filename)
-            # Clip the screenshot to the exact dimensions of the aspect ratio
-            await page.screenshot(path=output_path, clip={'x': 0, 'y': 0, 'width': width, 'height': height})
-            await browser.close()
-            return filename
+        try:
+            async with async_playwright() as p:
+                browser = await p.chromium.launch()
+                # Set the viewport to match the requested aspect ratio
+                context = await browser.new_context(viewport={'width': width, 'height': height})
+                page = await context.new_page()
+                
+                # Render the HTML with dynamic dimensions and BGs
+                html = Template(template_str).render(
+                    **data,
+                    logo_base64=self.logo_base64,
+                    width=width,
+                    height=height,
+                    datetime=datetime
+                )
+                
+                await page.set_content(html, wait_until='domcontentloaded', timeout=60000)
+                # Wait for any external assets (like Google Fonts or web images) to load
+                await asyncio.sleep(3) 
+                
+                output_path = os.path.join(OUTPUT_DIR, filename)
+                # Clip the screenshot to the exact dimensions of the aspect ratio
+                await page.screenshot(path=output_path, clip={'x': 0, 'y': 0, 'width': width, 'height': height})
+                await browser.close()
+                return filename
+        except Exception as e:
+            print(f"ENGINE ERROR: render_post failed: {e}")
+            return None
 
     async def generate_standard_post(self, item, topic, aspect_ratio="4:5", language="english"):
-        # 1. Summarize with language
-        summary = await self.summarizer.summarize_news(item['title'], item['summary'], language=language)
-        if not summary: return None
-        
-        # 2. Image Sourcing
-        image_url = await NewsFetcher.extract_hero_image(item['link'])
-        query, visual_ideal, protagonist, imagen_prompt = await self.summarizer.generate_search_query(summary['headline'], item['summary'])
+        try:
+            # 1. Summarize with language
+            summary = await self.summarizer.summarize_news(item['title'], item['summary'], language=language)
+            if not summary: 
+                print(f"ENGINE: Summary failed for {topic}")
+                return None
+            
+            # 2. Image Sourcing
+            image_url = await NewsFetcher.extract_hero_image(item['link'])
+            query, visual_ideal, protagonist, imagen_prompt = await self.summarizer.generate_search_query(summary['headline'], item['summary'])
         
         is_ai_image = False
         if not image_url or "google" in image_url.lower():
@@ -562,6 +569,9 @@ class InstagramEngine:
         
         DatabaseManager.save_post(topic, summary['headline'], summary['subtitle'], full_caption, path, item['link'])
         return path
+    except Exception as e:
+        print(f"ENGINE ERROR: generate_standard_post failed: {e}")
+        return None
 
     async def generate_satire_post(self, topic, aspect_ratio="9:16", language="english"):
         # Fetch news first to get context
