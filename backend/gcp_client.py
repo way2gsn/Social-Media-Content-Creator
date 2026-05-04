@@ -39,36 +39,15 @@ class GCPClient:
             self.key_data = json.load(f)
         
         self.project_id = self.key_data['project_id']
+        self.location = "asia-south1" # Locked to Mumbai for guaranteed stability
         self.credentials = service_account.Credentials.from_service_account_info(self.key_data)
         
-        # AUTO-REGION DETECTION: We will try regions with an ACTIVE ping test
-        self.working_location = None
-        for loc in ["us-central1", "us-east4", "us-east1", "asia-south1"]:
-            try:
-                print(f"GCP: Testing region {loc}...")
-                vertexai.init(project=self.project_id, location=loc, credentials=self.credentials)
-                test_model = GenerativeModel("gemini-1.5-flash")
-                # ACTIVE TEST: Actually try to generate one word
-                response = test_model.generate_content("hi", generation_config={"max_output_tokens": 1})
-                if response:
-                    self.location = loc
-                    self.text_model = test_model
-                    self.pro_model = GenerativeModel("gemini-1.5-pro")
-                    self.image_model = ImageGenerationModel.from_pretrained("imagegeneration@006")
-                    print(f"GCP: SUCCESS! Using {loc}")
-                    self.working_location = loc
-                    break
-            except Exception as e:
-                print(f"GCP: {loc} failed: {str(e)[:50]}...")
-                continue
+        print(f"GCP: Initializing in {self.location}...")
+        vertexai.init(project=self.project_id, location=self.location, credentials=self.credentials)
         
-        if not self.working_location:
-            print("GCP CRITICAL: No regions available. Falling back to us-central1 defaults.")
-            self.location = "us-central1"
-            vertexai.init(project=self.project_id, location=self.location, credentials=self.credentials)
-            self.text_model = GenerativeModel("gemini-1.5-flash")
-            self.pro_model = GenerativeModel("gemini-1.5-pro")
-            self.image_model = ImageGenerationModel.from_pretrained("imagegeneration@006")
+        self.text_model = GenerativeModel("gemini-1.5-flash")
+        self.pro_model = GenerativeModel("gemini-1.5-pro")
+        self.image_model = ImageGenerationModel.from_pretrained("imagegeneration@006")
 
         self.initialized = True
 
