@@ -107,6 +107,19 @@ export default function Home() {
     try { await fetch(`${API}/schedule/${id}`, { method: 'DELETE' }); fetchSchedules(); } catch {}
   };
 
+  const handleDeletePost = async (id: number) => {
+    if (!confirm("Are you sure you want to delete this post? This will permanently remove the file from the server.")) return;
+    try {
+      const res = await fetch(`${API}/delete_post/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        fetchGallery();
+        setSelectedPost(null);
+      }
+    } catch (err) {
+      console.error("Delete failed", err);
+    }
+  };
+
   const navItems = [
     { id: 'create', label: 'Create', icon: Sparkles },
     { id: 'gallery', label: 'Gallery', icon: History },
@@ -224,6 +237,11 @@ export default function Home() {
                     <img src={`${API}/static/output/${p.asset_path}`} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt={p.headline}/>
                   )}
                   <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex flex-col justify-end p-6">
+                    <div className="absolute top-4 right-4 flex gap-2">
+                       <button onClick={(e)=>{e.stopPropagation(); handleDeletePost(p.id);}} className="p-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500 hover:text-white transition-all shadow-lg">
+                         <Trash2 size={14}/>
+                       </button>
+                    </div>
                     <p className="text-[10px] uppercase font-bold text-amber-500 mb-1">{p.topic}</p>
                     <p className="text-sm font-bold text-white line-clamp-2">{p.headline}</p>
                     <button onClick={(e)=>{e.stopPropagation();setScheduleModal(p);setScheduleTime('');}} className="mt-3 flex items-center gap-2 text-[9px] uppercase font-black tracking-widest text-amber-500 bg-amber-500/10 border border-amber-500/20 px-3 py-2 rounded-lg hover:bg-amber-500 hover:text-black transition-all">
@@ -328,6 +346,9 @@ export default function Home() {
               <div className="mt-8 flex gap-4">
                 <button onClick={() => { setScheduleModal(selectedPost); setSelectedPost(null); setScheduleTime(''); }} className="flex-1 py-4 bg-amber-500 text-black font-black uppercase tracking-widest text-[10px] rounded-2xl hover:bg-amber-400 transition-all flex items-center justify-center gap-2">
                   <Calendar size={14}/>Schedule Post
+                </button>
+                <button onClick={() => handleDeletePost(selectedPost.id)} className="p-4 bg-red-500/10 text-red-500 border border-red-500/20 rounded-2xl hover:bg-red-500 hover:text-white transition-all" title="Delete Post">
+                  <Trash2 size={20}/>
                 </button>
                 <a href={`${API}/static/output/${selectedPost.asset_path}`} download className="p-4 bg-white/5 text-white rounded-2xl hover:bg-white/10 transition-all">
                   <Download size={20}/>

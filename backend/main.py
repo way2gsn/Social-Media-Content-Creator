@@ -165,6 +165,31 @@ async def perpetual_scheduler():
                                             success, msg = False, r_msg
                                     else:
                                         success, msg = False, c_msg
+@app.delete("/delete_post/{post_id}")
+async def delete_post(post_id: int):
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        
+        # Get asset path first to delete file
+        c.execute("SELECT asset_path FROM posts WHERE id = ?", (post_id,))
+        row = c.fetchone()
+        if row:
+            asset_path = row[0]
+            # Delete from static folder
+            full_path = os.path.join(STATIC_DIR, "output", os.path.basename(asset_path))
+            if os.path.exists(full_path):
+                os.remove(full_path)
+                print(f"DEBUG: Deleted file {full_path}")
+        
+        # Delete from DB
+        c.execute("DELETE FROM posts WHERE id = ?", (post_id,))
+        c.execute("DELETE FROM schedule WHERE post_id = ?", (post_id,))
+        conn.commit()
+        conn.close()
+        return {"status": "success"}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
                     else:
                         full_image_path = os.path.join(OUTPUT_DIR, task['asset_path'])
@@ -401,8 +426,14 @@ class AutonomousAutomation:
         musicalizer = Musicalizer()
         from datetime import datetime
         
-        # 1. Determine topics (Trending news)
-        topics = ["India Economy", "Tech India", "Startup India", "Political Irony", "Global News"]
+        # 1. Determine topics (Trending news / Specific Niches)
+        topics = [
+            "Indian Politics", "Current Affairs India", "Indian Elections", 
+            "Breaking News India", "Political Irony", "Indian History Facts", 
+            "India Trivia", "Indian Achievements", "Underdog Success India", 
+            "Protests India", "Indian Geography Discovery", "Indian Diplomacy", 
+            "Indian Economics", "USD to INR News", "India China Border"
+        ]
         random.shuffle(topics)
         
         # 2. Cycle Strategy: Generate a mix to reach 10 posts/5 reels per day
