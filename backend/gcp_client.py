@@ -39,14 +39,14 @@ class GCPClient:
             self.key_data = json.load(f)
         
         self.project_id = self.key_data['project_id']
-        self.location = "us-east4" # Switched from us-central1 for better availability
+        self.location = "us-east1" # Most stable region for Vertex AI
         
         self.credentials = service_account.Credentials.from_service_account_info(self.key_data)
         vertexai.init(project=self.project_id, location=self.location, credentials=self.credentials)
         
-        # Models - Switched to 1.0-pro for maximum compatibility across all GCP projects
-        self.text_model = GenerativeModel("gemini-1.0-pro")
-        self.pro_model = GenerativeModel("gemini-1.0-pro")
+        # Models - Using specific versions for 100% production reliability
+        self.text_model = GenerativeModel("gemini-1.5-flash-002")
+        self.pro_model = GenerativeModel("gemini-1.5-pro-002")
         self.image_model = ImageGenerationModel.from_pretrained("imagegeneration@006")
         
         self.initialized = True
