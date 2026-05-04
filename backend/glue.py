@@ -496,14 +496,15 @@ class InstagramEngine:
                     datetime=datetime
                 )
                 
-                await page.set_content(html, wait_until='domcontentloaded', timeout=60000)
-                # Wait for any external assets (like Google Fonts or web images) to load
-                # Increased to 5s for GCP server stability
-                await asyncio.sleep(5) 
+                # Use networkidle to ensure images are fully loaded before screenshot
+                print(f"DEBUG: Rendering post with wait_until='networkidle' (Image size: {len(data.get('image_url', ''))//1024} KB)")
+                await page.set_content(html, wait_until='networkidle', timeout=90000)
+                # Extra buffer for cloud stability
+                await asyncio.sleep(2) 
                 
                 output_path = os.path.join(OUTPUT_DIR, filename)
                 # Clip the screenshot to the exact dimensions of the aspect ratio
-                await page.screenshot(path=output_path, clip={'x': 0, 'y': 0, 'width': width, 'height': height})
+                await page.screenshot(path=output_path, clip={'x': 0, 'y': 0, 'width': width, 'height': height}, timeout=60000)
                 await browser.close()
                 return filename
         except Exception as e:
