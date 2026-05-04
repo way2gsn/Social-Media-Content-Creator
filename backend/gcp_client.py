@@ -42,13 +42,23 @@ class GCPClient:
         self.location = "us-central1" # Original working region
         self.credentials = service_account.Credentials.from_service_account_info(self.key_data)
         
-        print(f"GCP: Initializing in {self.location}...")
-        vertexai.init(project=self.project_id, location=self.location, credentials=self.credentials)
-        
-        # Using the most legacy-compatible model strings
-        self.text_model = GenerativeModel("gemini-pro")
-        self.pro_model = GenerativeModel("gemini-pro")
-        self.image_model = ImageGenerationModel.from_pretrained("imagegeneration@002")
+        print(f"GCP: Initializing in {self.location} for Project {self.project_id}...")
+        try:
+            vertexai.init(project=self.project_id, location=self.location, credentials=self.credentials)
+            # 1.5-flash-001 is the most stable entry-level model
+            self.text_model = GenerativeModel("gemini-1.5-flash-001")
+            self.pro_model = GenerativeModel("gemini-1.5-pro-001")
+            
+            # Load image model with a separate fallback
+            try:
+                self.image_model = ImageGenerationModel.from_pretrained("imagegeneration@006")
+            except Exception as img_err:
+                print(f"GCP: Image model loading failed, using fallback @005: {img_err}")
+                self.image_model = ImageGenerationModel.from_pretrained("imagegeneration@005")
+            
+            print("GCP: Vertex AI fully initialized.")
+        except Exception as e:
+            print(f"GCP CRITICAL ERROR: {str(e)}")
 
         self.initialized = True
     async def generate_text(self, prompt, system_instruction=None, json_mode=True, use_pro=False):
