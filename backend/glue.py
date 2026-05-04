@@ -505,8 +505,8 @@ class InstagramEngine:
             image_url = await NewsFetcher.extract_hero_image(item['link'])
             query, visual_ideal, protagonist, imagen_prompt = await self.summarizer.generate_search_query(summary['headline'], item['summary'])
         
-        is_ai_image = False
-        if not image_url or "google" in image_url.lower():
+            is_ai_image = False
+            if not image_url or "google" in image_url.lower():
             search_results = await NewsFetcher.search_image(query, summary['headline'], visual_ideal)
             if search_results:
                 image_url = search_results[0]
@@ -521,57 +521,57 @@ class InstagramEngine:
                     image_url = f"/static/output/{imagen_filename}"
                     is_ai_image = True
         
-        # 2b. Convert image to base64 for reliable Playwright rendering
-        image_base64 = None
-        if image_url:
-            try:
-                if image_url.startswith("/static/output/"):
-                    local_path = os.path.join(OUTPUT_DIR, os.path.basename(image_url))
-                    if os.path.exists(local_path):
-                        with open(local_path, "rb") as f:
-                            image_base64 = base64.b64encode(f.read()).decode()
-                else:
-                    headers = {"User-Agent": "Mozilla/5.0", "Accept": "image/*,*/*;q=0.8", "Referer": "https://www.google.com/"}
-                    async with httpx.AsyncClient(timeout=20.0, headers=headers, follow_redirects=True) as dl:
-                        resp = await dl.get(image_url)
-                        if resp.status_code == 200 and len(resp.content) > 5000:
-                            image_base64 = base64.b64encode(resp.content).decode()
-            except Exception as e:
-                print(f"DEBUG: Image base64 conversion failed: {e}")
-        
-        final_image_src = f"data:image/jpeg;base64,{image_base64}" if image_base64 else image_url
-        
-        # 3. Generate Deep Caption
-        caption_data = await self.summarizer.generate_deep_caption(summary['headline'], summary['subtitle'], item['summary'])
-        full_caption = caption_data.get('caption', f"{summary['headline']}\n\n{summary['subtitle']}")
-        
-        # 4. Template selection — dramatic (AI image) vs standard (web image)
-        if is_ai_image:
-            template_path = os.path.join(STUDIO_TEMPLATES_DIR, "EDITORIAL", "DRAMATIC.html")
-            if not os.path.exists(template_path):
+            # 2b. Convert image to base64 for reliable Playwright rendering
+            image_base64 = None
+            if image_url:
+                try:
+                    if image_url.startswith("/static/output/"):
+                        local_path = os.path.join(OUTPUT_DIR, os.path.basename(image_url))
+                        if os.path.exists(local_path):
+                            with open(local_path, "rb") as f:
+                                image_base64 = base64.b64encode(f.read()).decode()
+                    else:
+                        headers = {"User-Agent": "Mozilla/5.0", "Accept": "image/*,*/*;q=0.8", "Referer": "https://www.google.com/"}
+                        async with httpx.AsyncClient(timeout=20.0, headers=headers, follow_redirects=True) as dl:
+                            resp = await dl.get(image_url)
+                            if resp.status_code == 200 and len(resp.content) > 5000:
+                                image_base64 = base64.b64encode(resp.content).decode()
+                except Exception as e:
+                    print(f"DEBUG: Image base64 conversion failed: {e}")
+            
+            final_image_src = f"data:image/jpeg;base64,{image_base64}" if image_base64 else image_url
+            
+            # 3. Generate Deep Caption
+            caption_data = await self.summarizer.generate_deep_caption(summary['headline'], summary['subtitle'], item['summary'])
+            full_caption = caption_data.get('caption', f"{summary['headline']}\n\n{summary['subtitle']}")
+            
+            # 4. Template selection — dramatic (AI image) vs standard (web image)
+            if is_ai_image:
+                template_path = os.path.join(STUDIO_TEMPLATES_DIR, "EDITORIAL", "DRAMATIC.html")
+                if not os.path.exists(template_path):
+                    template_path = os.path.join(STUDIO_TEMPLATES_DIR, "EDITORIAL", "POST.html")
+            else:
                 template_path = os.path.join(STUDIO_TEMPLATES_DIR, "EDITORIAL", "POST.html")
-        else:
-            template_path = os.path.join(STUDIO_TEMPLATES_DIR, "EDITORIAL", "POST.html")
-        
-        with open(template_path, 'r') as f:
-            template_str = f.read()
+            
+            with open(template_path, 'r') as f:
+                template_str = f.read()
 
-        # 5. Render at 4:5
-        width, height = 1080, 1350
-        filename = f"news_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{os.urandom(4).hex()}.png"
-        path = await self.render_post(
-            {**summary, "image_url": final_image_src, "is_dramatic": is_ai_image},
-            template_str,
-            filename,
-            width=width,
-            height=height
-        )
-        
-        DatabaseManager.save_post(topic, summary['headline'], summary['subtitle'], full_caption, path, item['link'])
-        return path
-    except Exception as e:
-        print(f"ENGINE ERROR: generate_standard_post failed: {e}")
-        return None
+            # 5. Render at 4:5
+            width, height = 1080, 1350
+            filename = f"news_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{os.urandom(4).hex()}.png"
+            path = await self.render_post(
+                {**summary, "image_url": final_image_src, "is_dramatic": is_ai_image},
+                template_str,
+                filename,
+                width=width,
+                height=height
+            )
+            
+            DatabaseManager.save_post(topic, summary['headline'], summary['subtitle'], full_caption, path, item['link'])
+            return path
+        except Exception as e:
+            print(f"ENGINE ERROR: generate_standard_post failed: {e}")
+            return None
 
     async def generate_satire_post(self, topic, aspect_ratio="9:16", language="english"):
         # Fetch news first to get context
