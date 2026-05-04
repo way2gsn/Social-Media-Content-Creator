@@ -42,12 +42,12 @@ class GCPClient:
         self.location = "us-central1" # Original working region
         self.credentials = service_account.Credentials.from_service_account_info(self.key_data)
         
-        print(f"GCP: Initializing in {self.location} for Project {self.project_id}...")
+        print(f"GCP: Initializing in {self.location} with Secret Model gemini-2.5-flash...")
         try:
             vertexai.init(project=self.project_id, location=self.location, credentials=self.credentials)
-            # 1.5-flash-001 is the most stable entry-level model
-            self.text_model = GenerativeModel("gemini-1.5-flash-001")
-            self.pro_model = GenerativeModel("gemini-1.5-pro-001")
+            # This is the secret model that actually works for this project!
+            self.text_model = GenerativeModel("gemini-2.5-flash")
+            self.pro_model = GenerativeModel("gemini-2.5-flash") # Use same for pro
             
             # Load image model with a separate fallback
             try:
@@ -56,7 +56,7 @@ class GCPClient:
                 print(f"GCP: Image model loading failed, using fallback @005: {img_err}")
                 self.image_model = ImageGenerationModel.from_pretrained("imagegeneration@005")
             
-            print("GCP: Vertex AI fully initialized.")
+            print("GCP: Vertex AI fully UNLOCKED.")
         except Exception as e:
             print(f"GCP CRITICAL ERROR: {str(e)}")
 
