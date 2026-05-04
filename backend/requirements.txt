@@ -10,5 +10,3 @@ requests==2.31.0
 google-cloud-aiplatform==1.44.0
 google-auth==2.29.0
 pillow==10.2.0
-rembg==2.0.55
-sqlite3-api==0.1.0
