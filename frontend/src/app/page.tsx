@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Sparkles, Newspaper, History, Download, Layers, AlertCircle, Settings, Calendar, Clock, Trash2, Send, Play } from 'lucide-react';
 
-
+const API = typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:8000` : 'http://localhost:8000';
 
 export default function Home() {
   const [topics, setTopics] = useState('');
@@ -20,11 +20,6 @@ export default function Home() {
   const [schedules, setSchedules] = useState<any[]>([]);
   const [scheduleModal, setScheduleModal] = useState<any>(null);
   const [scheduleTime, setScheduleTime] = useState('');
-
-  // Dynamically determine the backend URL
-  const API = typeof window !== 'undefined' 
-    ? `${window.location.protocol}//${window.location.hostname}:8000`
-    : 'http://localhost:8000';
 
   useEffect(() => {
     let iv: any;
