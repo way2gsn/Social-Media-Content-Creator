@@ -77,10 +77,13 @@ class InstagramAPIEngine:
                 data = response.json()
                 url = data.get("data", {}).get("url")
                 if url:
-                    # Force HTTPS and Direct Download path
-                    direct_url = url.replace("http://tmpfiles.org/", "https://tmpfiles.org/dl/").replace("https://tmpfiles.org/", "https://tmpfiles.org/dl/")
-                    print(f"DEBUG: Proxy Success (TmpFiles): {direct_url}")
-                    return direct_url, "Success"
+                    # Cleanly force HTTPS and a SINGLE /dl/ path
+                    clean_url = url.replace("http://", "https://")
+                    if "/dl/" not in clean_url:
+                        clean_url = clean_url.replace("https://tmpfiles.org/", "https://tmpfiles.org/dl/")
+                    
+                    print(f"DEBUG: Proxy Success (TmpFiles): {clean_url}")
+                    return clean_url, "Success"
         except Exception as e:
             print(f"DEBUG: TmpFiles failed: {e}")
 
