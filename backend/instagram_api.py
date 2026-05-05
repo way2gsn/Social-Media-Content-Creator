@@ -13,7 +13,7 @@ class InstagramAPIEngine:
     def __init__(self, access_token=None, business_id=None):
         self.access_token = access_token
         self.business_id = business_id
-        self.api_version = "v21.0"
+        self.api_version = "v18.0"
         self.base_url = f"https://graph.facebook.com/{self.api_version}"
 
     async def upload_to_proxy(self, file_path):
@@ -28,7 +28,27 @@ class InstagramAPIEngine:
         is_video = file_path.lower().endswith(('.mp4', '.mov', '.m4v'))
         content_type = "video/mp4" if is_video else "image/jpeg"
         
-        # Strategy 1: Telegra.ph (Very fast, direct links, trusted by Meta)
+        # Strategy 1: Catbox.moe (Highly trusted by Meta crawlers)
+        try:
+            def sync_catbox():
+                with open(file_path, "rb") as f:
+                    files = {
+                        "reqtype": (None, "fileupload"),
+                        "fileToUpload": (os.path.basename(file_path), f, content_type)
+                    }
+                    return requests.post("https://catbox.moe/user/api.php", files=files, timeout=60, verify=False)
+            
+            response = await loop.run_in_executor(None, sync_catbox)
+            if response.status_code == 200 and response.text.startswith("http"):
+                url = response.text.strip()
+                # Ensure HTTPS
+                url = url.replace("http://", "https://")
+                print(f"DEBUG: Proxy Success (Catbox): {url}")
+                return url, "Success"
+        except Exception as e:
+            print(f"DEBUG: Catbox failed: {e}")
+
+        # Strategy 2: Telegra.ph (Fast for images)
         if not is_video:
             try:
                 def sync_telegraph():
@@ -46,24 +66,6 @@ class InstagramAPIEngine:
                             return url, "Success"
             except Exception as e:
                 print(f"DEBUG: Telegraph failed: {e}")
-
-        # Strategy 2: Catbox.moe
-        try:
-            def sync_catbox():
-                with open(file_path, "rb") as f:
-                    files = {
-                        "reqtype": (None, "fileupload"),
-                        "fileToUpload": (os.path.basename(file_path), f, content_type)
-                    }
-                    return requests.post("https://catbox.moe/user/api.php", files=files, timeout=60, verify=False)
-            
-            response = await loop.run_in_executor(None, sync_catbox)
-            if response.status_code == 200 and response.text.startswith("http"):
-                url = response.text.strip()
-                print(f"DEBUG: Proxy Success (Catbox): {url}")
-                return url, "Success"
-        except Exception as e:
-            print(f"DEBUG: Catbox failed: {e}")
 
         # Strategy 3: TmpFiles.org
         try:
@@ -245,6 +247,12 @@ class InstagramAPIEngine:
                 for _ in range(120): 
                     response = await client.get(url, params=params)
                     data = response.json()
+                    
+                    # BREAKOUT: If the API returns an actual error, stop polling immediately
+                    if "error" in data:
+                        error_msg = data.get("error", {}).get("message", "API Error")
+                        return False, f"Instagram API Error: {error_msg}"
+
                     status = data.get("status_code")
                     if status == "FINISHED":
                         return True, "Finished"
