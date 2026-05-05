@@ -510,20 +510,34 @@ class InstagramEngine:
                 # Use JPEG for better compatibility with Instagram Graph API
                 jpeg_filename = filename.replace(".png", ".jpg")
                 output_path = os.path.join(OUTPUT_DIR, jpeg_filename)
-                
+
                 # Clip the screenshot to the exact dimensions of the aspect ratio
+                # Using 1349 instead of 1350 to ensure we are safely within the 4:5 limit (0.8005 ratio)
+                clip_w, clip_h = (1080, 1349) if aspect_ratio == "4:5" else (width, height)
+                
                 await page.screenshot(
                     path=output_path, 
                     type='jpeg',
-                    quality=90,
-                    clip={'x': 0, 'y': 0, 'width': 1080, 'height': 1350} if aspect_ratio == "4:5" else None
+                    quality=100, # Use max quality for the raw shot
+                    clip={'x': 0, 'y': 0, 'width': clip_w, 'height': clip_h}
                 )
                 
                 await context.close()
                 await browser.close()
+
+                # --- SANITIZATION STEP ---
+                # Re-save with PIL to strip metadata and ensure standard RGB color space
+                try:
+                    from PIL import Image
+                    with Image.open(output_path) as img:
+                        # Force RGB and standard JPEG profile
+                        rgb_img = img.convert("RGB")
+                        rgb_img.save(output_path, "JPEG", quality=90, optimize=True, progressive=False)
+                    print(f"DEBUG: JPEG Sanitized OK: {output_path}")
+                except Exception as img_err:
+                    print(f"DEBUG: Image sanitization warning: {img_err}")
                 
                 print(f"DEBUG: Successfully rendered {aspect_ratio} post to {output_path}")
-                # Return the actual filename saved (might be .jpg now)
                 return jpeg_filename
         except Exception as e:
             print(f"ENGINE ERROR: render_post failed: {e}")
