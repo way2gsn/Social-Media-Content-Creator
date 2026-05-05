@@ -77,7 +77,8 @@ class InstagramAPIEngine:
                 data = response.json()
                 url = data.get("data", {}).get("url")
                 if url:
-                    direct_url = url.replace("https://tmpfiles.org/", "https://tmpfiles.org/dl/")
+                    # Force HTTPS and Direct Download path
+                    direct_url = url.replace("http://tmpfiles.org/", "https://tmpfiles.org/dl/").replace("https://tmpfiles.org/", "https://tmpfiles.org/dl/")
                     print(f"DEBUG: Proxy Success (TmpFiles): {direct_url}")
                     return direct_url, "Success"
         except Exception as e:
@@ -236,8 +237,8 @@ class InstagramAPIEngine:
 
         async with httpx.AsyncClient(timeout=60.0) as client:
             try:
-                # Poll until 'FINISHED' or timeout
-                for _ in range(30): # 30 attempts for carousels/videos as they take longer
+                # Wait up to 5 minutes (60 attempts * 5s) for larger files
+                for _ in range(60): 
                     response = await client.get(url, params=params)
                     data = response.json()
                     status = data.get("status_code")
