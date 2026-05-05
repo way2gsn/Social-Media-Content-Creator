@@ -101,7 +101,7 @@ async def perpetual_scheduler():
                                 folder_rel = os.path.dirname(task['asset_path'])
                                 folder_full = os.path.join(OUTPUT_DIR, folder_rel)
                                 
-                                slides = sorted([f for f in os.listdir(folder_full) if f.endswith(".png")])
+                                slides = sorted([f for f in os.listdir(folder_full) if f.lower().endswith((".png", ".jpg", ".jpeg"))])
                                 if not slides:
                                     success, msg = False, "No slides found in carousel folder."
                                 else:

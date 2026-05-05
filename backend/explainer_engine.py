@@ -266,7 +266,7 @@ class ExplainerEngine:
                 slide_paths = []
 
                 # --- SLIDE 1: COVER ---
-                cover_filename = os.path.join("carousels", carousel_id, "slide_01.png")
+                cover_filename = os.path.join("carousels", carousel_id, "slide_01.jpg")
                 template_path = os.path.join(EXPL_TEMPLATES_DIR, "EDITORIAL", "COVER.html")
                 if not os.path.exists(template_path):
                     template_path = os.path.join(EXPL_TEMPLATES_DIR, "EDITORIAL", "EXPLAINER.html")
@@ -299,7 +299,7 @@ class ExplainerEngine:
 
                 for s_idx, point in enumerate(points):
                     slide_num = s_idx + 2
-                    point_filename = os.path.join("carousels", carousel_id, f"slide_{slide_num:02d}.png")
+                    point_filename = os.path.join("carousels", carousel_id, f"slide_{slide_num:02d}.jpg")
                     
                     render_data_point = {
                         **plan,
