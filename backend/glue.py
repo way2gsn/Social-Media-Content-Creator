@@ -27,7 +27,10 @@ GCP_KEY_PATH = os.path.join(BACKEND_DIR, "key.json")
 STATIC_DIR = os.path.join(ROOT_DIR, "static")
 OUTPUT_DIR = os.path.join(STATIC_DIR, "output")
 DB_PATH = os.path.join(BACKEND_DIR, "automation.db")
-LOGO_PATH = os.path.join(ROOT_DIR, "Logo.png")
+LOGO_PATH = os.path.join(BACKEND_DIR, "Logo.png")
+if not os.path.exists(LOGO_PATH):
+    # Fallback for local dev if not moved yet
+    LOGO_PATH = os.path.join(ROOT_DIR, "Logo.png")
 
 # Studio Templates Directory
 STUDIO_TEMPLATES_DIR = os.path.join(BACKEND_DIR, "templates", "studio")
@@ -501,11 +504,24 @@ class InstagramEngine:
                 # Fixed buffer for image painting
                 await asyncio.sleep(3) 
                 
-                output_path = os.path.join(OUTPUT_DIR, filename)
+                # Use JPEG for better compatibility with Instagram Graph API
+                jpeg_filename = filename.replace(".png", ".jpg")
+                output_path = os.path.join(OUTPUT_DIR, jpeg_filename)
+                
                 # Clip the screenshot to the exact dimensions of the aspect ratio
-                await page.screenshot(path=output_path, clip={'x': 0, 'y': 0, 'width': width, 'height': height}, timeout=60000)
+                await page.screenshot(
+                    path=output_path, 
+                    type='jpeg',
+                    quality=90,
+                    clip={'x': 0, 'y': 0, 'width': 1080, 'height': 1350} if aspect_ratio == "4:5" else None
+                )
+                
+                await context.close()
                 await browser.close()
-                return filename
+                
+                print(f"DEBUG: Successfully rendered {aspect_ratio} post to {output_path}")
+                # Return the actual filename saved (might be .jpg now)
+                return jpeg_filename
         except Exception as e:
             print(f"ENGINE ERROR: render_post failed: {e}")
             return None
