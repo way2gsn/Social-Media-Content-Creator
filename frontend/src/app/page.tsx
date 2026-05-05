@@ -404,8 +404,7 @@ export default function Home() {
             
             <div className="p-10 space-y-8">
               {/* Content Engine Switches */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 bg-black/20 rounded-xl border border-white/5">
+                <div className="flex items-center justify-between p-4 bg-white/20 rounded-xl border border-white/5">
                   <div>
                     <p className="text-xs font-bold text-white uppercase tracking-wider">Background Music</p>
                     <p className="text-[10px] text-slate-500">Convert standard posts to Reels with music</p>
@@ -413,6 +412,17 @@ export default function Home() {
                   <button onClick={() => saveSettings({use_music: settings.use_music === 'true' ? 'false' : 'true'})}
                     className={`w-12 h-6 rounded-full transition-all relative ${settings.use_music === 'true' ? 'bg-amber-500' : 'bg-white/10'}`}>
                     <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${settings.use_music === 'true' ? 'left-7' : 'left-1'}`}/>
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between p-4 bg-white/20 rounded-xl border border-white/5">
+                  <div>
+                    <p className="text-xs font-bold text-white uppercase tracking-wider">Professional API Mode</p>
+                    <p className="text-[10px] text-slate-500">Use Instagram Graph API (Recommended for GCP)</p>
+                  </div>
+                  <button onClick={() => saveSettings({scheduler_mode: settings.scheduler_mode === 'api' ? 'automation' : 'api'})}
+                    className={`w-12 h-6 rounded-full transition-all relative ${settings.scheduler_mode === 'api' ? 'bg-emerald-500' : 'bg-white/10'}`}>
+                    <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${settings.scheduler_mode === 'api' ? 'left-7' : 'left-1'}`}/>
                   </button>
                 </div>
 
@@ -426,7 +436,6 @@ export default function Home() {
                     <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${settings.full_auto === 'true' ? 'left-7' : 'left-1'}`}/>
                   </button>
                 </div>
-              </div>
 
               {/* Instagram API Tokens */}
               <div className="space-y-4">
