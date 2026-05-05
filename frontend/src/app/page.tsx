@@ -312,7 +312,7 @@ export default function Home() {
                         {s.status}
                       </span>
                       {s.status === 'failed' && s.error_message && (
-                        <span className="text-[8px] text-red-500/60 max-w-[150px] truncate">{s.error_message}</span>
+                        <span className="text-[8px] text-red-500/80 max-w-[200px] leading-tight text-right break-words">{s.error_message}</span>
                       )}
                     </div>
                     {s.status==='pending'&&(
