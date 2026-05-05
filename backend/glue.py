@@ -755,6 +755,15 @@ class Musicalizer:
         if not os.path.exists(audio_path):
             return None, f"Audio track not found: {audio_filename}"
             
+        # Detect image dimensions to match video output
+        try:
+            from PIL import Image
+            with Image.open(image_path) as img:
+                w, h = img.size
+            print(f"DEBUG: Matching Reel resolution to image: {w}x{h}")
+        except:
+            w, h = 1080, 1350 # Default to 4:5 if detection fails
+            
         cmd = [
             "ffmpeg", "-y",
             "-loop", "1", "-i", image_path,
@@ -762,7 +771,7 @@ class Musicalizer:
             "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-r", "30", "-g", "60",
             "-t", str(duration),
             "-pix_fmt", "yuv420p",
-            "-vf", "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920",
+            "-vf", f"scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h}",
             "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-shortest",
             output_path
         ]
