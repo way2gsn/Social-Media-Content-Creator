@@ -46,11 +46,11 @@ class ExplainerEngine:
             "1. THE MAIN CHARACTER: The most important person in the story (e.g. 'Narendra Modi').\n"
             "2. THE CORE QUOTE or HEADLINE: A high-impact punchy statement.\n"
             "3. 3 KEY POINTS: Accurate, short bullet points explaining the news.\n"
-            "4. STYLE: Choose 'QUOTE' for direct statements, 'EXPLAINER' for standard news, or 'MODERN_EDITORIAL' for sophisticated feature stories.\n"
-            "5. THEME: Choose 'POLITICS' (Red/Dark), 'TECH' (Blue/Neon), 'CULTURE' (Gold/Warm), or 'CRIME' (Deep Red/Cold).\n"
-            "6. SUBJECT_TYPE: Choose 'PERSON' if it's about a specific individual, or 'OBJECT' if it's about a place, building, or thing.\n"
-            "7. LAYOUT: Choose 'CENTERED' for hero shots of leaders, or 'ASIDE' for editorial news analysis.\n"
-            "8. VISUAL_STRATEGY: Choose 'AI_GENERATE' if the story is historic/dramatic and needs a cinematic photo, or 'WEB_SEARCH' for current events.\n"
+            "4. STYLE: Choose 'QUOTE', 'EXPLAINER', or 'MODERN_EDITORIAL'.\n"
+            "5. THEME: Choose 'POLITICS' (Red), 'TECH' (Blue), 'CULTURE' (Gold), or 'CRIME' (Deep Red).\n"
+            "6. SUBJECT_TYPE: 'PERSON' or 'OBJECT'.\n"
+            "7. LAYOUT: 'CENTERED' for hero shots, 'ASIDE' for editorial analysis.\n"
+            "8. VISUAL_STRATEGY: 'AI_GENERATE' (preferred for premium look) or 'WEB_SEARCH' (only if it's a very specific recent photo).\n"
             f"NEWS CONTEXT: {news_context}\n"
             "Output strictly VALID JSON with keys: character_name, headline, points (list), style, theme, subject_type, layout, visual_strategy."
         )
@@ -205,10 +205,14 @@ class ExplainerEngine:
                     if hero_url: final_image_url = hero_url
                 except: print("DEBUG: Hero extraction failed.")
 
-                if not final_image_url and visual_strategy == 'AI_GENERATE':
+                if visual_strategy == 'AI_GENERATE':
                     print(f"DEBUG: Strategic Choice: Generating high-quality AI photo for '{topic}'")
                     try:
-                        imagen_prompt = f"Cinematic photo of {plan.get('character_name', topic)}. {plan.get('headline')}. Professional photography, news style, 8k, detailed lighting, photorealistic."
+                        imagen_prompt = (
+                            f"Cinematic editorial photography: {plan.get('character_name', topic)}. "
+                            f"{plan.get('headline')}. Professional news studio background, dramatic soft lighting, "
+                            "shallow depth of field, 8k, ultra-realistic, highly detailed, premium journalism aesthetic."
+                        )
                         img_bytes = await self.summarizer.client.generate_image(imagen_prompt, aspect_ratio="4:5")
                         if img_bytes:
                             imagen_filename = f"strategic_imagen_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
