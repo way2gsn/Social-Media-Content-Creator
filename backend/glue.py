@@ -746,11 +746,11 @@ class Musicalizer:
             "ffmpeg", "-y",
             "-loop", "1", "-i", image_path,
             "-i", audio_path,
-            "-c:v", "libx264",
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-r", "30", "-g", "60",
             "-t", str(duration),
             "-pix_fmt", "yuv420p",
-            "-vf", "scale=1080:1350:force_original_aspect_ratio=decrease,pad=1080:1350:(ow-iw)/2:(oh-ih)/2",
-            "-c:a", "aac", "-shortest",
+            "-vf", "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920",
+            "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-shortest",
             output_path
         ]
         
