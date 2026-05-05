@@ -285,9 +285,14 @@ export default function Home() {
                         <span className="text-[11px] text-slate-400">{new Date(s.scheduled_at).toLocaleString()}</span>
                       </div>
                     </div>
-                    <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${s.status==='pending'?'bg-amber-500/10 text-amber-500 border border-amber-500/20':s.status==='completed'?'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20':'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
-                      {s.status}
-                    </span>
+                    <div className="flex flex-col items-end gap-1">
+                      <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${s.status==='pending'?'bg-amber-500/10 text-amber-500 border border-amber-500/20':s.status==='completed'?'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20':'bg-red-500/10 text-red-400 border border-red-500/20'}`} title={s.error_message || ''}>
+                        {s.status}
+                      </span>
+                      {s.status === 'failed' && s.error_message && (
+                        <span className="text-[8px] text-red-500/60 max-w-[150px] truncate">{s.error_message}</span>
+                      )}
+                    </div>
                     {s.status==='pending'&&(
                       <button onClick={()=>deleteSchedule(s.id)} className="p-2 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-all"><Trash2 size={16}/></button>
                     )}
