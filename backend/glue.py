@@ -478,7 +478,10 @@ class InstagramEngine:
         except Exception as e:
             print(f"Cutout processing error: {e}")
         return None
-    async def render_post(self, data, template_str, filename, width=1080, height=1920):
+    async def render_post(self, data, template_str, filename, width=1080, height=1350, aspect_ratio="4:5"):
+        """
+        Renders a single post using a Jinja2 template and Playwright.
+        """
         try:
             async with async_playwright() as p:
                 browser = await p.chromium.launch(
@@ -642,7 +645,8 @@ class InstagramEngine:
                 template_str,
                 filename,
                 width=width,
-                height=height
+                height=height,
+                aspect_ratio="4:5"
             )
             
             DatabaseManager.save_post(topic, summary['headline'], summary['subtitle'], full_caption, path, item['link'])
@@ -702,7 +706,8 @@ class InstagramEngine:
             template_str,
             filename,
             width=width,
-            height=height
+            height=height,
+            aspect_ratio=aspect_ratio
         )
         
         headline = satire_data.get('headline', 'STRIKE')

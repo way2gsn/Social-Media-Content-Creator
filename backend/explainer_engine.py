@@ -286,7 +286,7 @@ class ExplainerEngine:
                     "is_cover": True
                 }
                 
-                path = await engine.render_post(render_data_cover, template_str, cover_filename, 1080, render_data_cover["view_height"])
+                path = await engine.render_post(render_data_cover, template_str, cover_filename, 1080, render_data_cover["view_height"], aspect_ratio=aspect_ratio)
                 if path: slide_paths.append(path)
 
                 # --- SLIDES 2+: POINTS ---
@@ -314,7 +314,7 @@ class ExplainerEngine:
                         "is_cover": False
                     }
 
-                    path = await engine.render_post(render_data_point, point_template_str, point_filename, 1080, render_data_point["view_height"])
+                    path = await engine.render_post(render_data_point, point_template_str, point_filename, 1080, render_data_point["view_height"], aspect_ratio=aspect_ratio)
                     if path: slide_paths.append(path)
 
                 if slide_paths:
