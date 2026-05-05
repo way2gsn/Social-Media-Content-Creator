@@ -241,8 +241,8 @@ class InstagramAPIEngine:
 
         async with httpx.AsyncClient(timeout=60.0) as client:
             try:
-                # Wait up to 5 minutes (60 attempts * 5s) for larger files
-                for _ in range(60): 
+                # Wait up to 10 minutes (120 attempts * 5s) for Reels/Large files
+                for _ in range(120): 
                     response = await client.get(url, params=params)
                     data = response.json()
                     status = data.get("status_code")
