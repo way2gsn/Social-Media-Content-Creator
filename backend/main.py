@@ -28,6 +28,9 @@ uploader = InstagramUploader()
 api_uploader = InstagramAPIEngine()
 
 DB_PATH = os.path.join(BACKEND_DIR, "automation.db")
+# Backend Version (Must match UI version)
+VERSION = "1.4.4"
+
 app = FastAPI()
 
 app.add_middleware(
@@ -194,6 +197,10 @@ async def perpetual_scheduler():
             print(f"SCHEDULER LOOP ERROR: {e}")
             
         await asyncio.sleep(60)
+
+@app.get("/version")
+async def get_version():
+    return {"version": VERSION}
 
 @app.get("/gallery")
 async def get_gallery():

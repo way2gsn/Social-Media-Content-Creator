@@ -20,6 +20,7 @@ export default function Home() {
   const [schedules, setSchedules] = useState<any[]>([]);
   const [scheduleModal, setScheduleModal] = useState<any>(null);
   const [scheduleTime, setScheduleTime] = useState('');
+  const [serverVersion, setServerVersion] = useState<string>('...');
 
   useEffect(() => {
     let iv: any;
@@ -88,7 +89,19 @@ export default function Home() {
     }
   };
 
-  useEffect(() => { fetchGallery(); fetchSettings(); fetchSchedules(); }, []);
+  useEffect(() => { 
+    fetchGallery(); 
+    fetchSettings(); 
+    fetchSchedules();
+    const checkVersion = async () => {
+      try {
+        const r = await fetch(`${API}/version`);
+        const d = await r.json();
+        setServerVersion(d.version);
+      } catch { setServerVersion('Offline'); }
+    };
+    checkVersion();
+  }, []);
 
   const handleGenerate = async (endpoint: string) => {
     const fd = new FormData();
@@ -162,7 +175,7 @@ export default function Home() {
           <div className="flex items-center gap-3 px-4 py-3 bg-white/5 rounded-2xl border border-white/10">
             <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)] animate-pulse" />
             <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
-              Engine v1.4.4
+              v1.4.4 (Server: {serverVersion})
             </span>
           </div>
         </div>
