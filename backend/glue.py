@@ -517,7 +517,7 @@ class InstagramEngine:
                 await page.screenshot(
                     path=output_path, 
                     type='jpeg',
-                    quality=100, 
+                    quality=85, # Standardizing to 85% to avoid 'Too Large/Too Complex' errors
                     clip={'x': 0, 'y': 0, 'width': clip_w, 'height': clip_h}
                 )
                 
