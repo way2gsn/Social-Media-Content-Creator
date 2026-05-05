@@ -154,10 +154,35 @@
             background: var(--accent);
             width: {{ (slide_index / total_slides) * 100 }}%;
         }
+        .layout-CENTERED .content { align-items: center; text-align: center; }
+        .layout-CENTERED .point-container { border-left: none; padding-left: 0; }
+        .layout-ASIDE .content { align-items: flex-start; text-align: left; }
         
+        /* 5. Character Support */
+        .character-container {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 5;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            opacity: 0.8; /* Subtle presence on point slides */
+        }
+        .character-cutout {
+            height: 80%;
+            width: auto;
+            object-fit: contain;
+        }
+
+        .layout-ASIDE .character-container { justify-content: flex-start; padding-left: 20px; }
+        .layout-CENTERED .character-container { justify-content: center; }
+
     </style>
 </head>
-<body class="theme-{{ theme }}">
+<body class="theme-{{ theme }} layout-{{ layout }}">
     <div class="bg-canvas">
         {% if original_image %}
         <img src="{{ original_image }}" class="bg-image-subtle">
@@ -165,6 +190,14 @@
         <div class="accent-blob"></div>
         <div class="dots"></div>
     </div>
+
+    <!-- Character Layer -->
+    {% if cutout_base64 %}
+    <div class="character-container">
+        <img src="data:image/png;base64,{{ cutout_base64 }}" class="character-cutout">
+    </div>
+    {% endif %}
+
     <div class="side-num">{{ slide_index }}</div>
 
     <div class="content">

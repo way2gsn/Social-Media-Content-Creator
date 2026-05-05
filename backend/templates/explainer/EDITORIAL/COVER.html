@@ -31,14 +31,37 @@
             position: absolute;
             inset: 0;
             z-index: 1;
+            background: radial-gradient(circle at 50% 50%, rgba(30,30,30,1) 0%, rgba(0,0,0,1) 100%);
         }
         .bg-img {
             width: 100%;
             height: 100%;
             object-fit: cover;
-            filter: brightness(0.7);
-            transform: scale(1.02);
+            filter: brightness(0.5) blur(10px);
+            opacity: 0.6;
         }
+
+        /* 2. Hero Character */
+        .character-container {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 5;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+        }
+        .character-cutout {
+            height: 90%;
+            width: auto;
+            object-fit: contain;
+            filter: drop-shadow(0 0 80px rgba(0,0,0,0.9));
+        }
+
+        .layout-ASIDE .character-container { justify-content: flex-start; padding-left: 50px; }
+        .layout-CENTERED .character-container { justify-content: center; }
 
         /* 3. Text Overlay */
         .scrim-bottom {
@@ -46,8 +69,8 @@
             bottom: 0;
             left: 0;
             width: 100%;
-            height: 70%;
-            background: linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,0.85) 40%, rgba(0,0,0,0.4) 70%, transparent 100%);
+            height: 60%;
+            background: linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,0.85) 30%, transparent 100%);
             z-index: 10;
             display: flex;
             align-items: flex-end;
@@ -115,12 +138,19 @@
         
     </style>
 </head>
-<body class="theme-{{ theme }}">
+<body class="theme-{{ theme }} layout-{{ layout }}">
     <div class="background-layer">
         {% if original_image %}
         <img src="{{ original_image }}" class="bg-img">
         {% endif %}
     </div>
+
+    <!-- Hero Character (Matches Explainer Slides) -->
+    {% if cutout_base64 %}
+    <div class="character-container">
+        <img src="data:image/png;base64,{{ cutout_base64 }}" class="character-cutout">
+    </div>
+    {% endif %}
 
     <div class="brand-header">
         <div class="brand-text">Humorously<br>Indians<span>.</span></div>

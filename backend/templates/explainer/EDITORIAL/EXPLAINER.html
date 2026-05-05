@@ -137,9 +137,22 @@
             display: block;
         }
         
+        /* 5. Layout Variants */
+        .layout-CENTERED .character-container { justify-content: center; }
+        .layout-ASIDE .character-container { justify-content: flex-start; padding-left: 50px; }
+        
+        /* 6. Improved Background depth */
+        .background-container::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at 50% 50%, transparent 0%, rgba(0,0,0,0.8) 100%);
+            z-index: 2;
+        }
+
     </style>
 </head>
-<body class="theme-{{ theme }}">
+<body class="theme-{{ theme }} layout-{{ layout }}">
     <!-- 1. Background Image -->
     <div class="background-container">
         {% if original_image %}

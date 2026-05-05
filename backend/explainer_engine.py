@@ -49,8 +49,10 @@ class ExplainerEngine:
             "4. STYLE: Choose 'QUOTE' for direct statements, 'EXPLAINER' for standard news, or 'MODERN_EDITORIAL' for sophisticated feature stories.\n"
             "5. THEME: Choose 'POLITICS' (Red/Dark), 'TECH' (Blue/Neon), 'CULTURE' (Gold/Warm), or 'CRIME' (Deep Red/Cold).\n"
             "6. SUBJECT_TYPE: Choose 'PERSON' if it's about a specific individual, or 'OBJECT' if it's about a place, building, or thing.\n"
+            "7. LAYOUT: Choose 'CENTERED' for hero shots of leaders, or 'ASIDE' for editorial news analysis.\n"
+            "8. VISUAL_STRATEGY: Choose 'AI_GENERATE' if the story is historic/dramatic and needs a cinematic photo, or 'WEB_SEARCH' for current events.\n"
             f"NEWS CONTEXT: {news_context}\n"
-            "Output strictly VALID JSON with keys: character_name, headline, points (list), style, theme, subject_type."
+            "Output strictly VALID JSON with keys: character_name, headline, points (list), style, theme, subject_type, layout, visual_strategy."
         )
         
         result = await self._gcp_request(prompt)
@@ -86,8 +88,8 @@ class ExplainerEngine:
                 "style": "EXPLAINER"
             }, f"AI Parsing Error: {e}"
 
-    def frame_character(self, img, side="left"):
-        """Standardizes a character cutout into a 1080x1350 vertical frame, positioned safely to an editorial side."""
+    def frame_character(self, img, layout="ASIDE"):
+        """Standardizes a character cutout into a 1080x1350 vertical frame with smart positioning."""
         # 1. Detect content bounding box
         bbox = img.getbbox()
         if not bbox: return img
@@ -98,22 +100,23 @@ class ExplainerEngine:
         frame_w, frame_h = 1080, 1350
         canvas = Image.new("RGBA", (frame_w, frame_h), (0, 0, 0, 0))
         
-        # 2. Scale subject to ~95% height for "WOW" factor (Massive presence)
-        target_h = int(frame_h * 0.95)
+        # 2. Resizing — Maintain Aspect Ratio
+        target_h = int(frame_h * 0.9) # Person takes up 90% of height
         ratio = target_h / sh
         new_w, new_h = int(sw * ratio), target_h
+        subject = subject.resize((new_w, new_h), Image.Resampling.LANCZOS)
         
-        # Ensure it doesn't exceed 95% width either
-        if new_w > frame_w * 0.95:
-            ratio = (frame_w * 0.95) / sw
-            new_w, new_h = int(frame_w * 0.95), int(sh * ratio)
+        # 3. Smart Positioning
+        if layout == "CENTERED":
+            # Hero Shot: Center-bottom
+            x_offset = (frame_w - new_w) // 2
+        else:
+            # Editorial Shot: Pushed to the left/right but with better padding
+            x_offset = int(frame_w * 0.05) # 5% margin from edge
             
-        scaled_subject = subject.resize((new_w, new_h), Image.Resampling.LANCZOS)
+        y_offset = frame_h - new_h # Align to bottom
         
-        # 3. Position with Center-Anchor
-        paste_x = (frame_w - new_w) // 2 if side == "center" else (50 if side == "left" else frame_w - new_w - 50)
-        paste_y = frame_h - new_h
-        canvas.paste(scaled_subject, (paste_x, paste_y), scaled_subject)
+        canvas.paste(subject, (x_offset, y_offset), subject)
         return canvas
 
     async def process_cutout(self, image_url, side="left"):
@@ -202,67 +205,77 @@ class ExplainerEngine:
                 try:
                     search_query = f"{plan['character_name']} official news"
                     search_results = await NewsFetcher.search_image(search_query, count=3)
-                    candidate_urls.extend(search_results)
-                except: print("DEBUG: Image search failed.")
+                # 3. Visual Sourcing — Poster Shield & Smart Choice
+                visual_strategy = plan.get('visual_strategy', 'WEB_SEARCH')
+                final_image_url = None
                 
-                final_image_url = candidate_urls[0] if candidate_urls else None
-
-                
-                # AI Image Fallback: If no image found at all, generate one
-                if not final_image_url:
-                    print(f"DEBUG: No image found for carousel. Generating with Imagen 3.")
+                if visual_strategy == 'AI_GENERATE':
+                    print(f"DEBUG: Strategic Choice: Generating high-quality AI photo for '{topic}'")
                     try:
-                        imagen_prompt = f"Editorial news photography: {plan.get('headline', topic)}. Cinematic lighting, high resolution, professional journalism style, 4K quality."
+                        imagen_prompt = f"Cinematic photo of {plan.get('character_name', topic)}. {plan.get('headline')}. Professional photography, news style, 8k, detailed lighting, photorealistic."
                         img_bytes = await self.summarizer.client.generate_image(imagen_prompt, aspect_ratio="4:5")
                         if img_bytes:
-                            imagen_filename = f"imagen_carousel_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+                            imagen_filename = f"strategic_imagen_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
                             imagen_path = os.path.join(OUTPUT_DIR, imagen_filename)
                             with open(imagen_path, "wb") as f:
                                 f.write(img_bytes)
                             final_image_url = f"/static/output/{imagen_filename}"
-                            print(f"DEBUG: AI image generated: {final_image_url}")
-                    except Exception as img_err:
-                        print(f"DEBUG: Imagen generation failed: {img_err}")
+                    except: print("DEBUG: Strategic AI generation failed, falling back to search.")
 
-                # Convert image URL to base64 so Playwright renders it reliably
+                if not final_image_url:
+                    # Web Search Fallback
+                    try:
+                        search_results = await NewsFetcher.search_image(f"{plan['character_name']} news photo", count=3)
+                        final_image_url = search_results[0] if search_results else None
+                    except: print("DEBUG: Web search failed.")
+
+                # Process Cutout with Smart Framing
+                layout = plan.get('layout', 'ASIDE')
                 image_base64 = None
+                cutout_base64 = None
                 if final_image_url:
                     try:
+                        # 1. Download and get raw Base64
                         if final_image_url.startswith("/static/output/"):
-                            # Local file — read directly
                             local_path = os.path.join(OUTPUT_DIR, os.path.basename(final_image_url))
-                            if os.path.exists(local_path):
-                                with open(local_path, "rb") as f:
-                                    image_base64 = base64.b64encode(f.read()).decode()
+                            with open(local_path, "rb") as f:
+                                raw_img_bytes = f.read()
                         else:
-                            # External URL — download and encode
-                            headers = {
-                                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
-                                "Accept": "image/*,*/*;q=0.8",
-                                "Referer": "https://www.google.com/"
-                            }
-                            async with httpx.AsyncClient(timeout=20.0, headers=headers, follow_redirects=True) as dl_client:
-                                img_resp = await dl_client.get(final_image_url)
-                                if img_resp.status_code == 200 and len(img_resp.content) > 5000:
-                                    image_base64 = base64.b64encode(img_resp.content).decode()
-                                    print(f"DEBUG: Image converted to base64 ({len(img_resp.content)} bytes)")
-                                else:
-                                    print(f"DEBUG: Image download failed or too small ({img_resp.status_code})")
+                            async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as dl:
+                                resp = await dl.get(final_image_url)
+                                raw_img_bytes = resp.content
+                        
+                        image_base64 = base64.b64encode(raw_img_bytes).decode()
+                        
+                        # 2. Generate Cutout for the whole batch
+                        if is_person:
+                            try:
+                                from PIL import Image
+                                from rembg import remove
+                                input_img = Image.open(io.BytesIO(raw_img_bytes))
+                                # Smart Center logic
+                                cutout_img = remove(input_img)
+                                framed_img = self.frame_character(cutout_img, layout=layout)
+                                
+                                buffered = io.BytesIO()
+                                framed_img.save(buffered, format="PNG")
+                                cutout_base64 = base64.b64encode(buffered.getvalue()).decode()
+                                print(f"DEBUG: Batch Cutout Generated ({layout})")
+                            except Exception as cut_err:
+                                print(f"DEBUG: Batch Cutout failed: {cut_err}")
                     except Exception as b64_err:
-                        print(f"DEBUG: Base64 conversion failed: {b64_err}")
+                        print(f"DEBUG: Image prep failed: {b64_err}")
 
-                # 4. Rendering Multi-Slide Carousel in Dedicated Folder
+                # 4. Rendering Multi-Slide Carousel
                 timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
                 carousel_id = f"carousel_{timestamp}_{idx}"
                 carousel_dir = os.path.join(OUTPUT_DIR, "carousels", carousel_id)
                 os.makedirs(carousel_dir, exist_ok=True)
                 
-                # Determine Layout
                 is_person = plan.get('subject_type', 'PERSON') == 'PERSON'
                 theme = plan.get('theme', 'POLITICS').upper()
-                
                 points = plan.get('points', [])
-                total_slides = len(points) + 1 # +1 for Cover
+                total_slides = len(points) + 1
                 slide_paths = []
 
                 # --- SLIDE 1: COVER ---
@@ -277,16 +290,18 @@ class ExplainerEngine:
                 render_data_cover = {
                     **plan,
                     "original_image": f"data:image/jpeg;base64,{image_base64}" if image_base64 else final_image_url,
+                    "cutout_base64": cutout_base64, 
+                    "layout": layout,
                     "is_person": is_person,
                     "language": language,
                     "slide_index": 1,
                     "total_slides": total_slides,
-                    "view_height": 1350 if aspect_ratio == "4:5" else 1920,
+                    "view_height": 1350, # Force 4:5
                     "theme": theme,
                     "is_cover": True
                 }
                 
-                path = await engine.render_post(render_data_cover, template_str, cover_filename, 1080, render_data_cover["view_height"], aspect_ratio=aspect_ratio)
+                path = await engine.render_post(render_data_cover, template_str, cover_filename, 1080, 1350, aspect_ratio="4:5")
                 if path: slide_paths.append(path)
 
                 # --- SLIDES 2+: POINTS ---
@@ -305,16 +320,18 @@ class ExplainerEngine:
                         **plan,
                         "current_point": point,
                         "original_image": f"data:image/jpeg;base64,{image_base64}" if image_base64 else final_image_url,
-                        "is_person": False, # Points slides are text-heavy
+                        "cutout_base64": cutout_base64,
+                        "layout": layout,
+                        "is_person": False,
                         "language": language,
                         "slide_index": slide_num,
                         "total_slides": total_slides,
-                        "view_height": 1350 if aspect_ratio == "4:5" else 1920,
+                        "view_height": 1350,
                         "theme": theme,
                         "is_cover": False
                     }
 
-                    path = await engine.render_post(render_data_point, point_template_str, point_filename, 1080, render_data_point["view_height"], aspect_ratio=aspect_ratio)
+                    path = await engine.render_post(render_data_point, point_template_str, point_filename, 1080, 1350, aspect_ratio="4:5")
                     if path: slide_paths.append(path)
 
                 if slide_paths:
