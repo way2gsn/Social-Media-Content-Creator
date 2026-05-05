@@ -237,7 +237,7 @@ class InstagramAPIEngine:
         """Check if the container is finished processing."""
         url = f"{self.base_url}/{container_id}"
         params = {
-            "fields": "status_code,error_message",
+            "fields": "status_code", # Only status_code is universal across v18-v21
             "access_token": self.access_token
         }
 
