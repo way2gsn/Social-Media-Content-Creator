@@ -28,7 +28,26 @@ class InstagramAPIEngine:
         is_video = file_path.lower().endswith(('.mp4', '.mov', '.m4v'))
         content_type = "video/mp4" if is_video else "image/jpeg"
         
-        # Strategy 1: Catbox.moe
+        # Strategy 1: Telegra.ph (Very fast, direct links, trusted by Meta)
+        if not is_video:
+            try:
+                def sync_telegraph():
+                    with open(file_path, "rb") as f:
+                        return requests.post("https://telegra.ph/upload", files={"file": (os.path.basename(file_path), f, content_type)}, timeout=30, verify=False)
+                
+                response = await loop.run_in_executor(None, sync_telegraph)
+                if response.status_code == 200:
+                    data = response.json()
+                    if isinstance(data, list) and len(data) > 0:
+                        path = data[0].get("src")
+                        if path:
+                            url = f"https://telegra.ph{path}"
+                            print(f"DEBUG: Proxy Success (Telegraph): {url}")
+                            return url, "Success"
+            except Exception as e:
+                print(f"DEBUG: Telegraph failed: {e}")
+
+        # Strategy 2: Catbox.moe
         try:
             def sync_catbox():
                 with open(file_path, "rb") as f:
@@ -46,7 +65,7 @@ class InstagramAPIEngine:
         except Exception as e:
             print(f"DEBUG: Catbox failed: {e}")
 
-        # Strategy 2: TmpFiles.org (Very reliable direct links)
+        # Strategy 3: TmpFiles.org
         try:
             def sync_tmpfiles():
                 with open(file_path, "rb") as f:
@@ -58,7 +77,6 @@ class InstagramAPIEngine:
                 data = response.json()
                 url = data.get("data", {}).get("url")
                 if url:
-                    # Transform to direct link
                     direct_url = url.replace("https://tmpfiles.org/", "https://tmpfiles.org/dl/")
                     print(f"DEBUG: Proxy Success (TmpFiles): {direct_url}")
                     return direct_url, "Success"
