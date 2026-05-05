@@ -19,80 +19,53 @@ class InstagramAPIEngine:
     async def upload_to_proxy(self, file_path):
         """
         Uploads a local file to a temporary public proxy.
-        Uses requests with verify=False to bypass local SSL certificate issues on Mac.
+        Uses multiple strategies for high reliability.
         """
         if not os.path.exists(file_path):
             return None, f"File not found: {file_path}"
         
         loop = asyncio.get_event_loop()
+        is_video = file_path.lower().endswith(('.mp4', '.mov', '.m4v'))
+        content_type = "video/mp4" if is_video else "image/jpeg"
         
-        # Strategy 1: Catbox.moe (Raw Multipart)
+        # Strategy 1: Catbox.moe
         try:
             def sync_catbox():
                 with open(file_path, "rb") as f:
                     files = {
                         "reqtype": (None, "fileupload"),
-                        "fileToUpload": (os.path.basename(file_path), f, "image/png" if file_path.endswith(".png") else "video/mp4")
+                        "fileToUpload": (os.path.basename(file_path), f, content_type)
                     }
                     return requests.post("https://catbox.moe/user/api.php", files=files, timeout=60, verify=False)
             
             response = await loop.run_in_executor(None, sync_catbox)
             if response.status_code == 200 and response.text.startswith("http"):
-                return response.text.strip(), "Success (Catbox)"
+                url = response.text.strip()
+                print(f"DEBUG: Proxy Success (Catbox): {url}")
+                return url, "Success"
         except Exception as e:
-            print(f"DEBUG: Catbox sync failed: {e}")
+            print(f"DEBUG: Catbox failed: {e}")
 
-        # Strategy 1b: Catbox via CURL (Bypasses Python SSL stack issues on Mac)
-        try:
-            cmd = [
-                "curl", "-k", "-s",
-                "-F", "reqtype=fileupload",
-                "-F", f"fileToUpload=@{file_path}",
-                "https://catbox.moe/user/api.php"
-            ]
-            proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
-            stdout, _ = await proc.communicate()
-            curl_res = stdout.decode().strip()
-            if curl_res.startswith("http"):
-                return curl_res, "Success (Catbox-Curl)"
-        except Exception as e:
-            print(f"DEBUG: Catbox-Curl failed: {e}")
-
-        # Strategy 2: File.io (JSON)
-        try:
-            def sync_fileio():
-                with open(file_path, "rb") as f:
-                    files = {"file": (os.path.basename(file_path), f, "image/png" if file_path.endswith(".png") else "video/mp4")}
-                    return requests.post("https://file.io", files=files, data={"expires": "1d"}, timeout=60, verify=False)
-
-            response = await loop.run_in_executor(None, sync_fileio)
-            if response.status_code == 200:
-                try:
-                    data = response.json()
-                    if data.get("success"):
-                        return data["link"], "Success (File.io)"
-                except: pass
-        except Exception as e:
-            print(f"DEBUG: File.io failed: {e}")
-
-        # Strategy 3: TmpFiles.org (Multipart)
+        # Strategy 2: TmpFiles.org (Very reliable direct links)
         try:
             def sync_tmpfiles():
                 with open(file_path, "rb") as f:
-                    files = {"file": (os.path.basename(file_path), f, "image/png" if file_path.endswith(".png") else "video/mp4")}
-                    return requests.post("https://tmpfiles.org/api/v1/upload", files=files, timeout=120, verify=False)
+                    files = {"file": (os.path.basename(file_path), f, content_type)}
+                    return requests.post("https://tmpfiles.org/api/v1/upload", files=files, timeout=60, verify=False)
             
             response = await loop.run_in_executor(None, sync_tmpfiles)
             if response.status_code == 200:
                 data = response.json()
-                # TmpFiles returns a URL like https://tmpfiles.org/XXXX/name.png
-                # We need to change it to https://tmpfiles.org/dl/XXXX/name.png for a direct link
                 url = data.get("data", {}).get("url")
                 if url:
+                    # Transform to direct link
                     direct_url = url.replace("https://tmpfiles.org/", "https://tmpfiles.org/dl/")
-                    return direct_url, "Success (TmpFiles)"
+                    print(f"DEBUG: Proxy Success (TmpFiles): {direct_url}")
+                    return direct_url, "Success"
         except Exception as e:
             print(f"DEBUG: TmpFiles failed: {e}")
+
+        return None, "All proxy bridges failed. Check connectivity."
 
         return None, "All proxy bridges failed (Catbox, File.io, TmpFiles). Check server logs."
 
