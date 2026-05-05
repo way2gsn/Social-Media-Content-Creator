@@ -511,14 +511,13 @@ class InstagramEngine:
                 jpeg_filename = filename.replace(".png", ".jpg")
                 output_path = os.path.join(OUTPUT_DIR, jpeg_filename)
 
-                # Clip the screenshot to the exact dimensions of the aspect ratio
-                # Using 1349 instead of 1350 to ensure we are safely within the 4:5 limit (0.8005 ratio)
-                clip_w, clip_h = (1080, 1349) if aspect_ratio == "4:5" else (width, height)
+                # Standard 4:5 vertical resolution for maximum Instagram compatibility
+                clip_w, clip_h = 1080, 1350
                 
                 await page.screenshot(
                     path=output_path, 
                     type='jpeg',
-                    quality=100, # Use max quality for the raw shot
+                    quality=100, 
                     clip={'x': 0, 'y': 0, 'width': clip_w, 'height': clip_h}
                 )
                 

@@ -175,6 +175,8 @@ class InstagramAPIEngine:
                 if "id" in data:
                     return data["id"], "Success"
                 error_msg = data.get('error', {}).get('message', 'Unknown error')
+                # Log full error for diagnostics
+                print(f"DEBUG: Instagram Carousel Item Error: {data}")
                 return None, f"Item Container Error: {error_msg}"
             except Exception as e:
                 return None, f"Request Error: {str(e)}"
