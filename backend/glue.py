@@ -112,12 +112,11 @@ class DatabaseManager:
         conn = sqlite3.connect(DB_PATH)
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
-        # Get schedules where scheduled_at is in the past and status is pending
-        # Using datetime() for robust comparison regardless of T or space separator
+        # FIX: Remove 'localtime' and use IST offset (+5.5h) for User compatibility.
         c.execute('''SELECT s.*, p.asset_path 
                      FROM schedules s 
                      JOIN posts p ON s.post_id = p.id 
-                     WHERE s.status = 'pending' AND datetime(s.scheduled_at) <= datetime('now', 'localtime')''')
+                     WHERE s.status = 'pending' AND datetime(s.scheduled_at) <= datetime('now', '+5 hours', '+30 minutes')''')
         rows = [dict(r) for r in c.fetchall()]
         conn.close()
         return rows
