@@ -195,21 +195,17 @@ class ExplainerEngine:
                 # Side determination
                 side = "right" if plan.get("style") == "QUOTE" else "left"
                 
-                # 3. Sourcing Image (Direct use, no cropping)
-                candidate_urls = []
-                try:
-                    hero_url = await NewsFetcher.extract_hero_image(source_url)
-                    if hero_url: candidate_urls.append(hero_url)
-                except: print("DEBUG: Hero extraction failed, continuing to search.")
-                
-                try:
-                    search_query = f"{plan['character_name']} official news"
-                    search_results = await NewsFetcher.search_image(search_query, count=3)
                 # 3. Visual Sourcing — Poster Shield & Smart Choice
                 visual_strategy = plan.get('visual_strategy', 'WEB_SEARCH')
                 final_image_url = None
                 
-                if visual_strategy == 'AI_GENERATE':
+                # Check for hero image from source first
+                try:
+                    hero_url = await NewsFetcher.extract_hero_image(source_url)
+                    if hero_url: final_image_url = hero_url
+                except: print("DEBUG: Hero extraction failed.")
+
+                if not final_image_url and visual_strategy == 'AI_GENERATE':
                     print(f"DEBUG: Strategic Choice: Generating high-quality AI photo for '{topic}'")
                     try:
                         imagen_prompt = f"Cinematic photo of {plan.get('character_name', topic)}. {plan.get('headline')}. Professional photography, news style, 8k, detailed lighting, photorealistic."
