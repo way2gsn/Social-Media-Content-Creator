@@ -29,7 +29,7 @@ api_uploader = InstagramAPIEngine()
 
 DB_PATH = os.path.join(BACKEND_DIR, "automation.db")
 # Backend Version (Must match UI version)
-VERSION = "1.4.4"
+VERSION = "1.4.5"
 
 app = FastAPI()
 
