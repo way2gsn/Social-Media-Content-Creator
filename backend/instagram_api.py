@@ -77,12 +77,13 @@ class InstagramAPIEngine:
                 data = response.json()
                 url = data.get("data", {}).get("url")
                 if url:
-                    # Cleanly force HTTPS and a SINGLE /dl/ path
-                    clean_url = url.replace("http://", "https://")
-                    if "/dl/" not in clean_url:
-                        clean_url = clean_url.replace("https://tmpfiles.org/", "https://tmpfiles.org/dl/")
+                    # Foolproof reconstruction: Slice and build to avoid any double-paths
+                    file_id_path = url.split("tmpfiles.org/")[-1]
+                    if file_id_path.startswith("dl/"):
+                        file_id_path = file_id_path[3:] # Strip existing dl/ if present
                     
-                    print(f"DEBUG: Proxy Success (TmpFiles): {clean_url}")
+                    clean_url = f"https://tmpfiles.org/dl/{file_id_path}"
+                    print(f"DEBUG: Proxy Success (TmpFiles - Reconstructed): {clean_url}")
                     return clean_url, "Success"
         except Exception as e:
             print(f"DEBUG: TmpFiles failed: {e}")
