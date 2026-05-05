@@ -15,7 +15,7 @@ try:
 except ImportError:
     REMBG_AVAILABLE = False
 
-from glue import LOGO_PATH, OUTPUT_DIR, AISummarizer, BACKEND_DIR, STATIC_DIR
+from glue import LOGO_PATH, OUTPUT_DIR, AISummarizer, BACKEND_DIR, STATIC_DIR, NewsFetcher
 
 EXPL_TEMPLATES_DIR = os.path.join(BACKEND_DIR, "templates", "explainer")
 
