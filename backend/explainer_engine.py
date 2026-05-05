@@ -45,14 +45,16 @@ class ExplainerEngine:
             "TASK: Analyze the news and extract:\n"
             "1. THE MAIN CHARACTER: The most important person in the story (e.g. 'Narendra Modi').\n"
             "2. THE CORE QUOTE or HEADLINE: A high-impact punchy statement.\n"
-            "3. 3 KEY POINTS: Accurate, short bullet points explaining the news.\n"
+            "3. 3-5 HIGH-VALUE POINTS: Accurate, short bullet points. If the topic is a 'Fact-check' or 'History', extract actual data.\n"
             "4. STYLE: Choose 'QUOTE', 'EXPLAINER', or 'MODERN_EDITORIAL'.\n"
             "5. THEME: Choose 'POLITICS' (Red), 'TECH' (Blue), 'CULTURE' (Gold), or 'CRIME' (Deep Red).\n"
             "6. SUBJECT_TYPE: 'PERSON' or 'OBJECT'.\n"
-            "7. LAYOUT: 'CENTERED' for hero shots, 'ASIDE' for editorial analysis.\n"
-            "8. VISUAL_STRATEGY: 'AI_GENERATE' (preferred for premium look) or 'WEB_SEARCH' (only if it's a very specific recent photo).\n"
+            "7. LAYOUT: 'CENTERED' or 'ASIDE'.\n"
+            "8. VISUAL_STRATEGY: 'AI_GENERATE' or 'WEB_SEARCH'.\n"
+            "9. IS_LISTICLE: Set to true if the headline implies a list (e.g. 'Facts', 'Significance', 'Reasons').\n"
+            "10. CONTENT_DEPTH: 'CAROUSEL_MANDATORY' for informational news, or 'SINGLE_POST_OK' for simple news updates.\n"
             f"NEWS CONTEXT: {news_context}\n"
-            "Output strictly VALID JSON with keys: character_name, headline, points (list), style, theme, subject_type, layout, visual_strategy."
+            "Output strictly VALID JSON with keys: character_name, headline, points (list), style, theme, subject_type, layout, visual_strategy, is_listicle, content_depth."
         )
         
         result = await self._gcp_request(prompt)
@@ -197,6 +199,16 @@ class ExplainerEngine:
                 
                 # 3. Visual Sourcing — Poster Shield & Smart Choice
                 visual_strategy = plan.get('visual_strategy', 'WEB_SEARCH')
+                is_listicle = plan.get('is_listicle', False)
+                content_depth = plan.get('content_depth', 'SINGLE_POST_OK')
+                
+                # FORCE CAROUSEL for Informational News
+                if is_listicle or content_depth == 'CAROUSEL_MANDATORY':
+                    print(f"DEBUG: Content Strategy Shift: Topic '{topic}' requires a Carousel for value delivery.")
+                    # We ensure points are extracted
+                    if not plan.get('points'):
+                        plan['points'] = ["Analyzing the impact...", "Key highlights and significance...", "Historical context..."]
+                
                 final_image_url = None
                 
                 # Check for hero image from source first
