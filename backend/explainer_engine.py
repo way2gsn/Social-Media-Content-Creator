@@ -410,9 +410,9 @@ class ExplainerEngine:
         
         # 2. Caption
         caption_data = await self.summarizer.generate_deep_caption(
-            plan['headline'], "Premium Quote", news_text, language=language
+            plan.get('headline', topic), plan.get('quote', 'Premium Quote'), news_text, language=language
         )
-        detailed_caption = caption_data.get('caption', f"{plan['headline']}\n\n{news_text}")
+        detailed_caption = caption_data.get('caption', f"{plan.get('headline', topic)}\n\n{news_text}")
         
         # 3. Image Sourcing
         final_image_url = None
