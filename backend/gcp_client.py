@@ -109,6 +109,40 @@ class GCPClient:
             print(f"GCP Text Error: {e}")
             return ""
 
+    async def analyze_image(self, image_path: str, prompt: str) -> str:
+        """Analyzes an image using Gemini Flash Vision capabilities."""
+        try:
+            with open(image_path, "rb") as f:
+                image_bytes = f.read()
+                
+            mime_type = "image/jpeg"
+            if image_path.lower().endswith(".png"): mime_type = "image/png"
+            elif image_path.lower().endswith(".webp"): mime_type = "image/webp"
+            
+            image_part = Part.from_data(image_bytes, mime_type=mime_type)
+            
+            import asyncio
+            import re
+            loop = asyncio.get_event_loop()
+            
+            model = self.pro_model
+            response = await loop.run_in_executor(
+                None,
+                lambda: model.generate_content([image_part, prompt])
+            )
+            
+            text = response.text if response and hasattr(response, 'text') else ""
+            if text:
+                text_content = text.strip()
+                cleaned = re.sub(r'^```(?:json)?\s*\n?', '', text_content)
+                cleaned = re.sub(r'\n?```\s*$', '', cleaned)
+                return cleaned.strip()
+            return ""
+        except Exception as e:
+            print(f"GCP Vision Error: {e}")
+            return ""
+
+
     async def generate_image(self, prompt, aspect_ratio="9:16"):
         """Generates an image using Imagen 3."""
         try:

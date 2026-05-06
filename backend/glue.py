@@ -661,7 +661,18 @@ class InstagramEngine:
                 height=height,
                 aspect_ratio="4:5"
             )
-            
+            if path:
+                from qa_agent import QAAgent
+                abs_img_path = os.path.join(STATIC_DIR, "output", os.path.basename(path))
+                is_approved, reason = await QAAgent.validate_post(abs_img_path, topic)
+                if not is_approved:
+                    print(f"🛑 QA REJECTED Standard Post: {topic} | Reason: {reason}")
+                    try:
+                        if os.path.exists(abs_img_path): os.remove(abs_img_path)
+                    except Exception:
+                        pass
+                    return None
+
             DatabaseManager.save_post(topic, summary['headline'], summary['subtitle'], full_caption, path, item['link'])
             return path
         except Exception as e:

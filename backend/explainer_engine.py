@@ -475,6 +475,19 @@ class ExplainerEngine:
         path = await engine.render_post(render_data, template_str, quote_filename, 1080, 1350, aspect_ratio="4:5")
         
         if path:
+            from qa_agent import QAAgent
+            from glue import STATIC_DIR
+            abs_img_path = os.path.join(STATIC_DIR, "output", os.path.basename(path))
+            
+            is_approved, reason = await QAAgent.validate_post(abs_img_path, topic)
+            if not is_approved:
+                print(f"🛑 QA REJECTED Quote: {topic} | Reason: {reason}")
+                try:
+                    if os.path.exists(abs_img_path): os.remove(abs_img_path)
+                except Exception as e:
+                    pass
+                return None, f"QA Rejected: {reason}"
+            
             from glue import DatabaseManager
             DatabaseManager.save_post(
                 topic, plan['headline'], f"Premium Quote ({theme})", detailed_caption, path, source_url
