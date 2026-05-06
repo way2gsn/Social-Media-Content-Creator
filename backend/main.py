@@ -29,7 +29,7 @@ api_uploader = InstagramAPIEngine()
 
 DB_PATH = os.path.join(BACKEND_DIR, "automation.db")
 # Backend Version (Must match UI version)
-VERSION = "1.7.0"
+VERSION = "1.7.1"
 
 app = FastAPI()
 
@@ -465,9 +465,21 @@ class AutonomousAutomation:
                     final_path = path
                     if tracks:
                         v_file, _ = await musicalizer.create_reel(abs_path, random.choice(tracks))
-                        if v_file: final_path = v_file
+                        if v_file: 
+                            final_path = v_file
+                            # ─── UPDATE DATABASE WITH VIDEO PATH ───
+                            try:
+                                conn = sqlite3.connect(DB_PATH)
+                                c = conn.cursor()
+                                # Find the post we just saved (it's the latest one with this image path)
+                                c.execute("UPDATE posts SET asset_path = ? WHERE asset_path = ?", (v_file, path))
+                                conn.commit()
+                                conn.close()
+                                print(f"🤖 [AUTONOMOUS] Post upgraded to Reel: {v_file}")
+                            except Exception as db_e:
+                                print(f"DEBUG: Failed to update DB with video path: {db_e}")
                     
-                    # Get post_id (last inserted)
+                    # 4. Get post_id for scheduling
                     conn = sqlite3.connect(DB_PATH)
                     c = conn.cursor()
                     c.execute("SELECT id, caption, asset_path FROM posts ORDER BY id DESC LIMIT 1")
