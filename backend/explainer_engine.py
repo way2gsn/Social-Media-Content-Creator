@@ -43,18 +43,19 @@ class ExplainerEngine:
             "SYSTEM: You are a Lead Editorial Designer for 'The Indian Express'.\n"
             f"{lang_instruction}\n"
             "TASK: Analyze the news and extract:\n"
-            "1. THE MAIN CHARACTER: The most important person in the story (e.g. 'Narendra Modi').\n"
-            "2. THE CORE QUOTE or HEADLINE: A high-impact punchy statement.\n"
-            "3. 3-5 HIGH-VALUE POINTS: Accurate, short bullet points. If the topic is a 'Fact-check' or 'History', extract actual data.\n"
-            "4. STYLE: Choose 'QUOTE', 'EXPLAINER', or 'MODERN_EDITORIAL'.\n"
-            "5. THEME: Choose 'POLITICS' (Red), 'TECH' (Blue), 'CULTURE' (Gold), or 'CRIME' (Deep Red).\n"
-            "6. SUBJECT_TYPE: 'PERSON' or 'OBJECT'.\n"
-            "7. LAYOUT: 'CENTERED' or 'ASIDE'.\n"
-            "8. VISUAL_STRATEGY: 'AI_GENERATE' or 'WEB_SEARCH'.\n"
-            "9. IS_LISTICLE: Set to true if the headline implies a list (e.g. 'Facts', 'Significance', 'Reasons').\n"
-            "10. CONTENT_DEPTH: 'CAROUSEL_MANDATORY' for informational news, or 'SINGLE_POST_OK' for simple news updates.\n"
+            "1. THE MAIN CHARACTER: The most important person in the story (e.g. 'Rahul Gandhi').\n"
+            "2. SECONDARY_CHARACTER: An opponent or subject mentioned (e.g. 'Narendra Modi'). Leave empty if none.\n"
+            "3. THE CORE QUOTE or HEADLINE: A high-impact punchy statement.\n"
+            "4. 3-5 HIGH-VALUE POINTS: Accurate, short bullet points. If the topic is a 'Fact-check' or 'History', extract actual data.\n"
+            "5. STYLE: Choose 'EXPLAINER', 'MODERN_EDITORIAL', 'SATIRE', or 'QUOTE'.\n"
+            "6. THEME: Choose 'POLITICS' (Red), 'TECH' (Blue), 'CULTURE' (Gold), or 'CRIME' (Deep Red).\n"
+            "7. SUBJECT_TYPE: 'PERSON' or 'OBJECT'.\n"
+            "8. LAYOUT: 'CENTERED', 'ASIDE', or 'DUAL_HERO'.\n"
+            "9. VISUAL_STRATEGY: 'AI_GENERATE' or 'WEB_SEARCH'.\n"
+            "10. IS_LISTICLE: Set to true if the headline implies a list (e.g. 'Facts', 'Significance', 'Reasons').\n"
+            "11. CONTENT_DEPTH: 'CAROUSEL_MANDATORY' or 'SINGLE_POST_OK'.\n"
             f"NEWS CONTEXT: {news_context}\n"
-            "Output strictly VALID JSON with keys: character_name, headline, points (list), style, theme, subject_type, layout, visual_strategy, is_listicle, content_depth."
+            "Output strictly VALID JSON with keys: character_name, secondary_character, headline, points (list), style, theme, subject_type, layout, visual_strategy, is_listicle, content_depth."
         )
         
         result = await self._gcp_request(prompt)
@@ -201,6 +202,7 @@ class ExplainerEngine:
                 visual_strategy = plan.get('visual_strategy', 'WEB_SEARCH')
                 is_listicle = plan.get('is_listicle', False)
                 content_depth = plan.get('content_depth', 'SINGLE_POST_OK')
+                is_person = plan.get('subject_type', 'PERSON') == 'PERSON'
                 
                 # FORCE CAROUSEL for Informational News
                 if is_listicle or content_depth == 'CAROUSEL_MANDATORY':
@@ -245,6 +247,8 @@ class ExplainerEngine:
                 layout = plan.get('layout', 'ASIDE')
                 image_base64 = None
                 cutout_base64 = None
+                secondary_cutout_base64 = None
+                
                 if final_image_url:
                     try:
                         # 1. Download and get raw Base64
@@ -259,22 +263,36 @@ class ExplainerEngine:
                         
                         image_base64 = base64.b64encode(raw_img_bytes).decode()
                         
-                        # 2. Generate Cutout for the whole batch
+                        # 2. Generate Cutout
                         if is_person:
                             try:
                                 from PIL import Image
                                 from rembg import remove
                                 input_img = Image.open(io.BytesIO(raw_img_bytes))
-                                # Smart Center logic
                                 cutout_img = remove(input_img)
                                 framed_img = self.frame_character(cutout_img, layout=layout)
-                                
                                 buffered = io.BytesIO()
                                 framed_img.save(buffered, format="PNG")
                                 cutout_base64 = base64.b64encode(buffered.getvalue()).decode()
-                                print(f"DEBUG: Batch Cutout Generated ({layout})")
+                                
+                                # 2b. Secondary Character for Dual-Hero
+                                secondary_name = plan.get('secondary_character')
+                                if secondary_name:
+                                    print(f"DEBUG: Processing Secondary Character: {secondary_name}")
+                                    s_search = await NewsFetcher.search_image(f"{secondary_name} official portrait", count=1)
+                                    if s_search:
+                                        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as s_dl:
+                                            s_resp = await s_dl.get(s_search[0])
+                                            s_img = Image.open(io.BytesIO(s_resp.content))
+                                            s_cutout = remove(s_img)
+                                            # We use 'CENTERED' for secondary insets
+                                            s_framed = self.frame_character(s_cutout, layout='CENTERED')
+                                            s_buf = io.BytesIO()
+                                            s_framed.save(s_buf, format="PNG")
+                                            secondary_cutout_base64 = base64.b64encode(s_buf.getvalue()).decode()
+                                            print("DEBUG: Secondary Cutout OK.")
                             except Exception as cut_err:
-                                print(f"DEBUG: Batch Cutout failed: {cut_err}")
+                                print(f"DEBUG: Cutout failed: {cut_err}")
                     except Exception as b64_err:
                         print(f"DEBUG: Image prep failed: {b64_err}")
 
@@ -292,7 +310,11 @@ class ExplainerEngine:
 
                 # --- SLIDE 1: COVER ---
                 cover_filename = os.path.join("carousels", carousel_id, "slide_01.jpg")
-                template_path = os.path.join(EXPL_TEMPLATES_DIR, "EDITORIAL", "COVER.html")
+                style = plan.get('style', 'EXPLAINER').upper()
+                
+                template_file = "COVER.html"
+                
+                template_path = os.path.join(EXPL_TEMPLATES_DIR, "EDITORIAL", template_file)
                 if not os.path.exists(template_path):
                     template_path = os.path.join(EXPL_TEMPLATES_DIR, "EDITORIAL", "EXPLAINER.html")
                 
@@ -302,9 +324,9 @@ class ExplainerEngine:
                 render_data_cover = {
                     **plan,
                     "original_image": f"data:image/jpeg;base64,{image_base64}" if image_base64 else final_image_url,
-                    "cutout_base64": cutout_base64, 
+                    "cutout_image": cutout_base64, 
+                    "secondary_cutout": secondary_cutout_base64,
                     "layout": layout,
-                    "is_person": is_person,
                     "language": language,
                     "slide_index": 1,
                     "total_slides": total_slides,
@@ -334,7 +356,6 @@ class ExplainerEngine:
                         "original_image": f"data:image/jpeg;base64,{image_base64}" if image_base64 else final_image_url,
                         "cutout_base64": cutout_base64,
                         "layout": layout,
-                        "is_person": False,
                         "language": language,
                         "slide_index": slide_num,
                         "total_slides": total_slides,
@@ -369,3 +390,94 @@ class ExplainerEngine:
                 statuses.append(f"Error on item {idx+1}: {str(e)}")
 
         return results, " | ".join(statuses)
+
+    async def generate_quote_post(self, topic, language="english"):
+        """Generates a standalone, single-image premium Quote post."""
+        items = NewsFetcher.fetch_by_topic(topic, count=1)
+        if not items: return None, "No news found"
+        
+        item = items[0]
+        news_text = f"{item['title']} {item['summary']}"
+        source_url = item['link']
+        
+        # 1. Plan Visuals
+        plan, _ = await self.plan_explainer(topic, news_text, language=language)
+        if not plan: return None, "AI Plan failed"
+        
+        # Force style to QUOTE
+        plan['style'] = 'QUOTE'
+        theme = plan.get('theme', 'POLITICS').upper()
+        
+        # 2. Caption
+        caption_data = await self.summarizer.generate_deep_caption(
+            plan['headline'], "Premium Quote", news_text, language=language
+        )
+        detailed_caption = caption_data.get('caption', f"{plan['headline']}\n\n{news_text}")
+        
+        # 3. Image Sourcing
+        final_image_url = None
+        try:
+            hero_url = await NewsFetcher.extract_hero_image(source_url)
+            if hero_url: final_image_url = hero_url
+        except: pass
+        
+        if not final_image_url:
+            try:
+                search_results = await NewsFetcher.search_image(f"{plan['character_name']} high quality news photo", count=1)
+                final_image_url = search_results[0] if search_results else None
+            except: pass
+            
+        # 4. Process Cutout
+        cutout_base64 = None
+        image_base64 = None
+        
+        if final_image_url:
+            try:
+                if final_image_url.startswith("/static/output/"):
+                    local_path = os.path.join(OUTPUT_DIR, os.path.basename(final_image_url))
+                    with open(local_path, "rb") as f:
+                        raw_img_bytes = f.read()
+                else:
+                    async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as dl:
+                        resp = await dl.get(final_image_url)
+                        raw_img_bytes = resp.content
+                
+                image_base64 = base64.b64encode(raw_img_bytes).decode()
+                
+                # Cutout
+                out_bytes = remove(raw_img_bytes)
+                img = Image.open(io.BytesIO(out_bytes)).convert("RGBA")
+                framed = self.frame_character(img, layout="CENTERED")
+                buf = io.BytesIO()
+                framed.save(buf, format="PNG")
+                cutout_base64 = base64.b64encode(buf.getvalue()).decode()
+            except Exception as e:
+                print(f"Quote Cutout Error: {e}")
+        
+        # 5. Render
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        quote_filename = f"quote_{timestamp}.jpg"
+        
+        template_path = os.path.join(EXPL_TEMPLATES_DIR, "EDITORIAL", "QUOTE.html")
+        with open(template_path, 'r') as f:
+            template_str = f.read()
+            
+        render_data = {
+            **plan,
+            "original_image": f"data:image/jpeg;base64,{image_base64}" if image_base64 else final_image_url,
+            "cutout_image": cutout_base64,
+            "view_height": 1350,
+            "theme": theme
+        }
+        
+        from glue import InstagramEngine
+        engine = InstagramEngine()
+        path = await engine.render_post(render_data, template_str, quote_filename, 1080, 1350, aspect_ratio="4:5")
+        
+        if path:
+            from glue import DatabaseManager
+            DatabaseManager.save_post(
+                topic, plan['headline'], f"Premium Quote ({theme})", detailed_caption, path, source_url
+            )
+            return path, "Success"
+        return None, "Rendering failed"

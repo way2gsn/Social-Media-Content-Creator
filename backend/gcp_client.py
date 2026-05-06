@@ -31,10 +31,15 @@ class GCPClient:
             cls._instance = super(GCPClient, cls).__new__(cls)
         return cls._instance
 
-    def __init__(self, key_path="key.json"):
+    def __init__(self, key_path=None):
         if hasattr(self, 'initialized'):
             return
         
+        if key_path is None:
+            # Auto-resolve relative to this file
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            key_path = os.path.join(base_dir, "key.json")
+            
         with open(key_path, 'r') as f:
             self.key_data = json.load(f)
         

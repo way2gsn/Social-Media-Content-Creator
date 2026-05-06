@@ -3,13 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@1,700&family=Syne:wght@800&family=Inter:wght@400;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&family=Playfair+Display:ital,wght@0,700;0,900;1,700&display=swap');
         
         :root {
-            --accent: #991b1b; /* Deep Crimson */
-            --bg: #000000;
-            --grid: rgba(153, 27, 27, 0.15);
+            --accent: #d97706; /* Amber/rusty accent */
+            --bg: #1a1a1a;
         }
+
+        .theme-TECH { --accent: #d97706; }
+        .theme-CULTURE { --accent: #b45309; }
+        .theme-CRIME { --accent: #92400e; }
+        .theme-POLITICS { --accent: #c2410c; }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
@@ -18,204 +22,189 @@
             height: {{ view_height }}px;
             background-color: var(--bg);
             color: #fff;
-            font-family: 'Inter', sans-serif;
+            font-family: 'Outfit', sans-serif;
             overflow: hidden;
             position: relative;
-            margin: 0;
-            padding: 0;
         }
 
-        /* 1. Dramatic Background Layers */
-        .scenic-bg {
+        /* 1. Background Logic & Rusty Overlay */
+        .background-layer {
             position: absolute;
             inset: 0;
-            z-index: 0;
-            object-fit: cover;
-            filter: grayscale(1) brightness(0.15) blur(10px);
-            opacity: 0.6;
-        }
-
-        .spotlight {
-            position: absolute;
-            inset: 0;
-            background: radial-gradient(circle at 65% 50%, rgba(153, 27, 27, 0.25) 0%, transparent 75%);
             z-index: 1;
+            background: linear-gradient(to bottom, #111, #000);
         }
-
-        .geometry-overlay {
-            position: absolute;
-            inset: 0;
-            background-image: 
-                radial-gradient(var(--grid) 1.5px, transparent 1.5px);
-            background-size: 50px 50px;
-            opacity: 0.4;
-            z-index: 2;
-        }
-
-        /* 2. Character Cutout (Monochrome Power - Pre-Framed by Backend) */
-        .character-cutout {
-            position: absolute;
-            inset: 0;
+        .bg-img {
             width: 100%;
             height: 100%;
-            z-index: 10;
-            filter: grayscale(1) contrast(1.25) brightness(0.85) drop-shadow(-50px 0 100px rgba(0,0,0,1));
+            object-fit: cover;
+            filter: grayscale(100%) brightness(0.3) contrast(1.5) sepia(30%);
+            opacity: 0.6;
+            mix-blend-mode: multiply;
         }
 
-        /* 3. Quote Panel (Centered Authority) */
-        .quote-panel {
+        /* Noise Texture for Premium Rusty Look */
+        .texture-overlay {
             position: absolute;
             inset: 0;
-            padding: 130px;
-            z-index: 20;
+            z-index: 2;
+            opacity: 0.4;
+            pointer-events: none;
+            mix-blend-mode: overlay;
+        }
+
+        /* 2. Hero Character */
+        .character-container {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 5;
+        }
+        .character-cutout {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            object-position: bottom center;
+            /* Black and White Filter + Contrast for Premium Look */
+            filter: grayscale(100%) contrast(120%) brightness(0.9) drop-shadow(-20px 20px 50px rgba(0,0,0,1));
+        }
+
+        /* 3. Text Overlay */
+        .quote-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 15;
+            padding: 120px 80px;
             display: flex;
             flex-direction: column;
-            justify-content: center;
-            max-width: 880px;
+            justify-content: flex-start;
+            background: linear-gradient(to right, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.7) 50%, transparent 100%);
         }
 
         .quote-mark {
-            font-size: 320px;
-            font-family: 'Syne', sans-serif;
+            font-family: 'Playfair Display', serif;
+            font-size: 350px;
             color: var(--accent);
-            line-height: 0;
+            line-height: 0.1;
             margin-bottom: 80px;
+            margin-left: -20px;
             opacity: 0.9;
-            filter: drop-shadow(0 10px 20px rgba(153, 27, 27, 0.3));
+            text-shadow: 0 10px 30px rgba(0,0,0,0.8);
         }
 
-        .main-quote {
-            font-family: 'Lora', serif;
-            font-size: 76px;
-            font-weight: 700;
-            font-style: italic;
+        .headline {
+            font-family: 'Playfair Display', serif;
+            font-size: 72px;
+            font-weight: 900;
             line-height: 1.1;
-            letter-spacing: -2.5px;
-            margin-bottom: 65px;
-            text-shadow: 0 15px 50px rgba(0,0,0,1);
+            text-transform: uppercase;
+            max-width: 650px;
+            text-shadow: 0 10px 40px rgba(0,0,0,1);
+            margin-bottom: 50px;
+            letter-spacing: -1px;
         }
 
-        .attribution-box {
-            display: flex;
-            align-items: center;
-            gap: 30px;
-        }
-
-        .dash {
-            width: 90px;
-            height: 10px;
-            background: var(--accent);
-            box-shadow: 0 0 15px rgba(153, 27, 27, 0.5);
+        .headline span {
+            color: var(--accent);
+            font-style: italic;
         }
 
         .attribution {
-            font-family: 'Syne', sans-serif;
+            margin-top: auto;
+            margin-bottom: 40px;
+            border-left: 6px solid var(--accent);
+            padding-left: 30px;
+        }
+        .author-name {
+            font-weight: 900;
+            font-size: 28px;
             text-transform: uppercase;
-            letter-spacing: 7px;
-            font-weight: 800;
-            font-size: 26px;
-            color: white;
-            text-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            letter-spacing: 3px;
+            color: #fff;
+        }
+        .author-title {
+            font-size: 16px;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 5px;
+            margin-top: 8px;
+            font-weight: 700;
         }
 
-        /* 4. Branding & Index (V4) */
-        .header-meta {
+        /* 4. Brand & Logo */
+        .brand-header {
             position: absolute;
             top: 60px;
-            left: 60px;
+            right: 80px;
             z-index: 100;
             display: flex;
             align-items: center;
-            gap: 15px;
+            gap: 20px;
         }
-
-        .brand-logo {
-            width: 80px;
-            height: 80px;
+        
+        .logo-circle {
+            width: 60px;
+            height: 60px;
             border-radius: 50%;
             overflow: hidden;
-            border: 3px solid var(--accent);
-            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
-            object-fit: cover;
+            background: #fff;
+            border: 2px solid var(--accent);
         }
+        .logo-img { width: 100%; height: 100%; object-fit: cover; }
 
-        .index-tag {
-            font-family: 'Syne', sans-serif;
-            font-size: 20px;
-            letter-spacing: 4px;
-            color: var(--accent);
-            opacity: 0.8;
-            transform: translateY(2px);
-        }
-
-
-        .footer {
-            position: absolute;
-            top: 50%;
-            right: 40px;
-            transform: translateY(-50%) rotate(90deg);
-            transform-origin: center right;
-            display: flex;
-            align-items: center;
-            gap: 20px;
-            z-index: 30;
-            opacity: 0.8;
-            white-space: nowrap;
-        }
-
-        .brand-label {
-            font-family: 'Anton', sans-serif;
+        .brand-text {
+            font-weight: 900;
             font-size: 14px;
-            font-weight: 400;
             text-transform: uppercase;
-            letter-spacing: 7px;
-            color: #991b1b;
+            letter-spacing: 4px;
+            text-align: right;
+            color: #aaa;
         }
+        .brand-text span { color: var(--accent); }
+        
     </style>
 </head>
-<body>
-    <div class="header-meta">
-        {% if logo_base64 %}
-        <img src="data:image/png;base64,{{ logo_base64 }}" class="brand-logo">
+<body class="theme-{{ theme }}">
+    <div class="background-layer">
+        {% if original_image %}
+        <img src="{{ original_image }}" class="bg-img">
         {% endif %}
-        <div class="index-tag">EDITORIAL // {{ slide_index }}</div>
     </div>
 
-    {% if original_image %}
-    <img src="{{ original_image }}" class="scenic-bg">
-    {% endif %}
-    <div class="spotlight"></div>
-    <div class="geometry-overlay"></div>
+    <svg class="texture-overlay" xmlns="http://www.w3.org/2000/svg">
+        <filter id="noiseFilter">
+            <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="4" stitchTiles="stitch"/>
+        </filter>
+        <rect width="100%" height="100%" filter="url(#noiseFilter)"/>
+    </svg>
 
-    {% if cutout_base64 %}
-    <img src="data:image/png;base64,{{ cutout_base64 }}" class="character-cutout">
-    {% elif silhouette %}
-    <div class="character-cutout" style="display: flex; align-items: flex-end; justify-content: center; filter: none;">
-        <svg width="700" height="1100" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="opacity: 0.8; transform: scaleX(-1);">
-            <path d="M12 12C14.21 12 16 10.21 16 8C16 5.79 14.21 4 12 4C9.79 4 8 5.79 8 8C8 10.21 9.79 12 12 12ZM12 14C9.33 14 4 15.34 4 18V20H20V18C20 15.34 14.67 14 12 14Z" fill="url(#grad2)"/>
-            <defs>
-                <linearGradient id="grad2" x1="12" y1="4" x2="12" y2="20" gradientUnits="userSpaceOnUse">
-                    <stop stop-color="#991b1b"/>
-                    <stop offset="1" stop-color="#000000"/>
-                </linearGradient>
-            </defs>
-        </svg>
+    <div class="character-container">
+        {% if cutout_image %}
+        <img src="data:image/png;base64,{{ cutout_image }}" class="character-cutout">
+        {% endif %}
     </div>
-    {% elif original_image %}
-    <img src="{{ original_image }}" class="character-cutout" style="opacity: 0.3; filter: grayscale(1) blur(8px) contrast(1.4);">
-    {% endif %}
 
-    <div class="quote-panel">
-        <div class="quote-mark">“</div>
-        <h1 class="main-quote">{{ headline }}</h1>
-        <div class="attribution-box">
-            <div class="dash"></div>
-            <div class="attribution">{{ character_name }}</div>
+    <div class="quote-overlay">
+        <div class="brand-header">
+            <div class="brand-text">HUMOROUSLY<br><span>INDIANS</span></div>
+            <div class="logo-circle">
+                {% if logo_base64 %}
+                <img src="data:image/png;base64,{{ logo_base64 }}" class="logo-img">
+                {% endif %}
+            </div>
         </div>
-    </div>
 
-    <div class="footer">
-        <span class="brand-label">Humorously Indians</span>
+        <div class="quote-mark">“</div>
+        <h1 class="headline">{{ headline }}</h1>
+        
+        <div class="attribution">
+            <div class="author-name">{{ character_name }}</div>
+        </div>
     </div>
 </body>
 </html>

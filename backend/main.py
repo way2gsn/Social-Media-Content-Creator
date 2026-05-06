@@ -29,7 +29,7 @@ api_uploader = InstagramAPIEngine()
 
 DB_PATH = os.path.join(BACKEND_DIR, "automation.db")
 # Backend Version (Must match UI version)
-VERSION = "1.7.1"
+VERSION = "1.8.0" # Announcement & Template Lab Upgrade
 
 app = FastAPI()
 
@@ -235,6 +235,20 @@ async def generate_carousel_endpoint(topics: str = Form(...), count: int = Form(
     background_tasks.add_task(run_carousel_generation, task_id, topic_list, language, count)
     return {"task_id": task_id}
 
+# ─── 3. QUOTE POST (4:5, single-slide, template-based) ───────────────
+@app.post("/generate-quote")
+async def generate_quote_endpoint(topics: str = Form(...), language: str = Form("english"), background_tasks: BackgroundTasks = None):
+    task_id = str(uuid.uuid4())[:8]
+    topic_list = [t.strip() for t in topics.split(",")]
+    tasks[task_id] = {
+        "status": "Starting Quote Engine...",
+        "progress": 0,
+        "logs": [f"Initialized Premium Quote for {topics} ({language})"],
+        "results": []
+    }
+    background_tasks.add_task(run_quote_generation, task_id, topic_list, language)
+    return {"task_id": task_id}
+
 @app.delete("/delete_post/{post_id}")
 async def delete_post(post_id: int):
     try:
@@ -410,6 +424,51 @@ async def run_carousel_generation(task_id, topics, language, count=1):
     except Exception as e:
         update_task(task_id, "Error", 0, [f"CRITICAL ERROR: {str(e)}"])
 
+async def run_quote_generation(task_id, topics, language):
+    try:
+        from glue import Musicalizer, DatabaseManager, STATIC_DIR
+        import os
+        import sqlite3
+        
+        settings = DatabaseManager.get_settings()
+        use_music = settings.get('use_music', False)
+        default_track = settings.get('default_track', 'lofi')
+        musicalizer = Musicalizer()
+        
+        total = len(topics)
+        completed = 0
+        for topic in topics:
+            update_task(task_id, f"Planning quote for {topic}...", int((completed / total) * 100), [f"Starting quote analysis for '{topic}'"])
+            path, status_msg = await explainer_engine.generate_quote_post(topic, language=language)
+            update_task(task_id, f"Rendering quote...", int(((completed + 0.5) / total) * 100), [f"Engine: {status_msg}"])
+            
+            if path:
+                # Video Conversion (Musicalizer)
+                if use_music:
+                    tracks = musicalizer.get_tracks()
+                    if tracks:
+                        track = default_track if default_track in tracks else tracks[0]
+                        update_task(task_id, f"Adding Music: {track}...", int(((completed + 0.8) / total) * 100), [f"Musicalizing {path}..."])
+                        abs_img_path = os.path.join(STATIC_DIR, "output", os.path.basename(path))
+                        video_filename, v_msg = await musicalizer.create_reel(abs_img_path, track)
+                        
+                        if video_filename:
+                            new_path = video_filename
+                            conn = sqlite3.connect(DB_PATH)
+                            c = conn.cursor()
+                            c.execute("UPDATE posts SET asset_path = ? WHERE asset_path = ?", (new_path, path))
+                            conn.commit()
+                            conn.close()
+                            path = new_path
+                            print(f"DEBUG: Quote upgraded to video: {new_path}")
+                
+                if task_id in tasks: tasks[task_id]["results"].append(path)
+                update_task(task_id, f"Quote complete", int(((completed + 1) / total) * 100), [f"Quote rendered successfully."])
+            completed += 1
+        update_task(task_id, "Success", 100, ["Quote batch complete!"])
+    except Exception as e:
+        update_task(task_id, "Error", 0, [f"CRITICAL ERROR: {str(e)}"])
+
 # DB patch
 def patch_db_manager():
     def get_all_posts():
@@ -452,12 +511,19 @@ class AutonomousAutomation:
         
         generated_assets = [] 
         
-        # Generate Standard Posts
+        # Generate Posts (Mix of Standard and Quote)
         items = NewsFetcher.fetch_batch(topics[:2], count=post_count)
         for item in items:
             try:
-                # Use a background task style generation
-                path = await engine.generate_standard_post(item, item['title'], language="english")
+                # 30% chance to generate a Premium Quote
+                is_quote = random.random() < 0.3
+                if is_quote:
+                    print(f"🤖 [AUTONOMOUS] Generating Premium Quote for: {item['title']}")
+                    path, _ = await explainer_engine.generate_quote_post(item['title'], language="english")
+                else:
+                    print(f"🤖 [AUTONOMOUS] Generating Standard Post for: {item['title']}")
+                    path = await engine.generate_standard_post(item, item['title'], language="english")
+                
                 if path:
                     # Check if we should musicalize
                     tracks = musicalizer.get_tracks()

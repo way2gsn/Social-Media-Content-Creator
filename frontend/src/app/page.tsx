@@ -139,6 +139,7 @@ export default function Home() {
   const navItems = [
     { id: 'create', label: 'Create', icon: Sparkles },
     { id: 'gallery', label: 'Gallery', icon: History },
+    { id: 'templates', label: 'Templates', icon: Layers },
     { id: 'schedule', label: 'Schedule', icon: Calendar },
   ];
 
@@ -175,7 +176,7 @@ export default function Home() {
           <div className="flex items-center gap-3 px-4 py-3 bg-white/5 rounded-2xl border border-white/10">
             <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)] animate-pulse" />
             <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
-              v1.7.1 (Server: {serverVersion})
+              v1.8.0 (Server: {serverVersion})
             </span>
           </div>
         </div>
@@ -192,12 +193,15 @@ export default function Home() {
                   <label className="text-[10px] uppercase font-black text-slate-500 tracking-[0.25em] mb-4 block">Topic / News Context</label>
                   <textarea value={topics} onChange={e=>setTopics(e.target.value)} placeholder="Describe the news or paste a headline..."
                     className="w-full bg-black/40 border border-white/5 rounded-2xl p-6 text-white text-lg placeholder:text-slate-700 focus:outline-none focus:border-amber-500/50 transition-all h-48 resize-none"/>
-                  <div className="mt-8 pt-8 border-t border-white/5 grid grid-cols-2 gap-4">
+                  <div className="mt-8 pt-8 border-t border-white/5 grid grid-cols-3 gap-4">
                     <button onClick={()=>handleGenerate('/generate')} className="h-20 bg-white text-black font-black uppercase tracking-widest text-[10px] rounded-2xl hover:bg-slate-200 transition-all flex flex-col items-center justify-center gap-2 group">
                       <Newspaper size={22} className="group-hover:scale-110 transition-transform"/>Standard Post
                     </button>
                     <button onClick={()=>handleGenerate('/generate-carousel')} className="h-20 bg-amber-500 text-black font-black uppercase tracking-widest text-[10px] rounded-2xl hover:bg-amber-400 transition-all flex flex-col items-center justify-center gap-2 group shadow-[0_0_40px_rgba(245,158,11,0.15)]">
                       <Layers size={22} className="group-hover:scale-110 transition-transform"/>Carousel
+                    </button>
+                    <button onClick={()=>handleGenerate('/generate-quote')} className="h-20 bg-[#d97706] text-black font-black uppercase tracking-widest text-[10px] rounded-2xl hover:bg-[#b45309] hover:text-white transition-all flex flex-col items-center justify-center gap-2 group shadow-[0_0_40px_rgba(217,119,6,0.2)]">
+                      <Sparkles size={22} className="group-hover:scale-110 transition-transform"/>Quote Post
                     </button>
                   </div>
                 </div>
@@ -276,6 +280,42 @@ export default function Home() {
                 </div>
               ))}
               {gallery.length===0&&(<div className="col-span-full py-32 text-center text-slate-600 uppercase tracking-widest text-xs font-bold border-2 border-dashed border-white/5 rounded-3xl">No posts yet</div>)}
+            </div>
+          </div>
+        )}
+        {/* ── TEMPLATES TAB ── */}
+        {activeTab === 'templates' && (
+          <div className="space-y-8 animate-in fade-in duration-700">
+            <header>
+              <h2 className="text-4xl font-extrabold text-white mb-2 tracking-tight uppercase italic">Template <span className="text-amber-500">Lab</span></h2>
+              <p className="text-slate-500 uppercase tracking-widest text-[10px] font-bold">Preview our premium editorial design systems.</p>
+            </header>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {[
+                { name: 'Premium Quote', desc: 'Rusty B&W aesthetic single post', style: 'QUOTE', color: 'text-[#d97706]' },
+                { name: 'Explainer', desc: 'Thematic news multi-slide story', style: 'EXPLAINER', color: 'text-rose-500' },
+                { name: 'Modern Editorial', desc: 'Clean, professional news layout', style: 'MODERN_EDITORIAL', color: 'text-cyan-500' },
+                { name: 'Satire Studio', desc: 'Bureaucratic irony & spin', style: 'SATIRE', color: 'text-emerald-500' },
+              ].map(t => (
+                <div key={t.style} className="group relative bg-[#0a0d14] border border-white/5 rounded-[40px] p-8 hover:border-amber-500/30 transition-all duration-500 overflow-hidden">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 blur-3xl -mr-16 -mt-16 group-hover:bg-amber-500/10 transition-all"></div>
+                  <div className="relative z-10">
+                    <span className={`text-[10px] font-black uppercase tracking-[0.3em] ${t.color}`}>{t.style}</span>
+                    <h3 className="text-2xl font-black text-white mt-2 mb-4 italic uppercase">{t.name}</h3>
+                    <p className="text-slate-500 text-sm mb-8 leading-relaxed">{t.desc}</p>
+                    
+                    <div className="grid grid-cols-2 gap-4 opacity-40 group-hover:opacity-100 transition-opacity">
+                       <div className="aspect-[4/5] bg-white/5 rounded-2xl border border-white/10 flex items-center justify-center overflow-hidden">
+                          <span className="text-[10px] font-bold uppercase text-slate-700">Cover</span>
+                       </div>
+                       <div className="aspect-[4/5] bg-white/5 rounded-2xl border border-white/10 flex items-center justify-center">
+                          <span className="text-[10px] font-bold uppercase text-slate-700">Insights</span>
+                       </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
