@@ -138,6 +138,7 @@ export default function Home() {
 
   const navItems = [
     { id: 'create', label: 'Create', icon: Sparkles },
+    { id: 'cinematic', label: 'Cinematic', icon: Play },
     { id: 'gallery', label: 'Gallery', icon: History },
     { id: 'templates', label: 'Templates', icon: Layers },
     { id: 'schedule', label: 'Schedule', icon: Calendar },
@@ -240,6 +241,53 @@ export default function Home() {
                         <span className="text-sm font-black text-white w-6 text-center">{count}</span>
                       </div>
                     </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── CINEMATIC TAB ── */}
+        {activeTab === 'cinematic' && (
+          <div className="space-y-8 animate-in fade-in duration-700">
+            <header><h2 className="text-4xl font-extrabold text-white mb-2 tracking-tight">Cinematic Video Studio</h2><p className="text-slate-500">Generate professional documentary-style AI videos.</p></header>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+              <div className="lg:col-span-8 space-y-6">
+                <div className="p-8 rounded-[32px] bg-white/[0.02] border border-white/10 backdrop-blur-3xl shadow-2xl relative overflow-hidden">
+                  <div className="absolute top-0 right-0 p-4 opacity-10">
+                    <Play size={120} />
+                  </div>
+                  <label className="text-[10px] uppercase font-black text-slate-500 tracking-[0.25em] mb-4 block">Video Topic / Script Concept</label>
+                  <textarea value={topics} onChange={e=>setTopics(e.target.value)} placeholder="E.g., The truth about Indian elections, or the hidden economics of street food..."
+                    className="w-full bg-black/40 border border-white/5 rounded-2xl p-6 text-white text-lg placeholder:text-slate-700 focus:outline-none focus:border-emerald-500/50 transition-all h-48 resize-none relative z-10"/>
+                  <div className="mt-8 pt-8 border-t border-white/5">
+                    <button onClick={()=>handleGenerate('/generate-cinematic')} className="w-full h-20 bg-emerald-600 text-white font-black uppercase tracking-widest text-xs rounded-2xl hover:bg-emerald-500 transition-all flex items-center justify-center gap-3 shadow-[0_0_40px_rgba(16,185,129,0.2)]">
+                      <Play size={24} /> Generate Full Cinematic Video
+                    </button>
+                  </div>
+                </div>
+                {activeTask && taskStatus && (
+                  <div className="p-6 rounded-3xl bg-black/40 border border-white/5 h-48 flex flex-col">
+                    <h3 className="text-[9px] uppercase font-black text-slate-600 tracking-widest mb-3">Live Video Production Logs</h3>
+                    <div className="flex-1 overflow-y-auto space-y-1.5 pr-4 custom-scrollbar font-mono text-[11px]">
+                      {taskStatus.logs.map((log:string,i:number) => (
+                        <div key={i} className="text-slate-500 flex gap-3">
+                          <span className="text-emerald-500/30 whitespace-nowrap">[{new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}]</span>
+                          <span className={log.includes('ERROR')?'text-red-400':log.includes('success')?'text-emerald-500/70':''}>{log}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="lg:col-span-4 space-y-6">
+                <div className="p-6 rounded-3xl bg-white/[0.02] border border-emerald-500/20">
+                  <h3 className="text-[10px] uppercase font-black text-emerald-500 tracking-[0.2em] mb-4">Powered By</h3>
+                  <div className="space-y-4 text-xs font-medium text-slate-400">
+                    <div className="flex items-center gap-3"><Sparkles size={14} className="text-emerald-500"/> Gemini 2.5 Flash Scripting</div>
+                    <div className="flex items-center gap-3"><Play size={14} className="text-emerald-500"/> Google TTS Journey Voices</div>
+                    <div className="flex items-center gap-3"><Layers size={14} className="text-emerald-500"/> Veo 3.1 Lite Video Gen</div>
                   </div>
                 </div>
               </div>
