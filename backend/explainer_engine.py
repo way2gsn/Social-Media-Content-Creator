@@ -40,19 +40,19 @@ class ExplainerEngine:
             lang_instruction = "OUTPUT LANGUAGE: Hinglish (Romanized Hindi + English mix)."
 
         prompt = (
-            "SYSTEM: You are a Lead Editorial Designer for 'The Indian Express'.\n"
+            "SYSTEM: You are a Lead Editorial Designer. You MUST identify specific people by name.\n"
             f"{lang_instruction}\n"
             "TASK: Analyze the news and extract:\n"
-            "1. THE MAIN CHARACTER: The most important person in the story (e.g. 'Rahul Gandhi').\n"
-            "2. SECONDARY_CHARACTER: An opponent or subject mentioned (e.g. 'Narendra Modi'). Leave empty if none.\n"
+            "1. THE MAIN CHARACTER: Identify the SPECIFIC PERSON by name (e.g. 'Rahul Gandhi', 'Narendra Modi'). Do NOT use generic titles like 'Politician' if a name is present.\n"
+            "2. SECONDARY_CHARACTER: An opponent or subject mentioned by name. Leave empty if none.\n"
             "3. THE CORE QUOTE or HEADLINE: A high-impact punchy statement.\n"
-            "4. 3-5 HIGH-VALUE POINTS: Accurate, short bullet points. If the topic is a 'Fact-check' or 'History', extract actual data.\n"
-            "5. STYLE: Choose 'EXPLAINER', 'MODERN_EDITORIAL', 'SATIRE', or 'QUOTE'.\n"
-            "6. THEME: Choose 'POLITICS' (Red), 'TECH' (Blue), 'CULTURE' (Gold), or 'CRIME' (Deep Red).\n"
+            "4. 3-5 HIGH-VALUE POINTS: Accurate, short bullet points.\n"
+            "5. STYLE: 'EXPLAINER', 'MODERN_EDITORIAL', 'SATIRE', or 'QUOTE'.\n"
+            "6. THEME: 'POLITICS', 'TECH', 'CULTURE', or 'CRIME'.\n"
             "7. SUBJECT_TYPE: 'PERSON' or 'OBJECT'.\n"
             "8. LAYOUT: 'CENTERED', 'ASIDE', or 'DUAL_HERO'.\n"
-            "9. VISUAL_STRATEGY: 'AI_GENERATE' or 'WEB_SEARCH'.\n"
-            "10. IS_LISTICLE: Set to true if the headline implies a list (e.g. 'Facts', 'Significance', 'Reasons').\n"
+            "9. VISUAL_STRATEGY: 'AI_GENERATE' (ALWAYS for copyright safety).\n"
+            "10. IS_LISTICLE: boolean.\n"
             "11. CONTENT_DEPTH: 'CAROUSEL_MANDATORY' or 'SINGLE_POST_OK'.\n"
             f"NEWS CONTEXT: {news_context}\n"
             "Output strictly VALID JSON with keys: character_name, secondary_character, headline, points (list), style, theme, subject_type, layout, visual_strategy, is_listicle, content_depth."
@@ -210,91 +210,81 @@ class ExplainerEngine:
                     # We ensure points are extracted
                     if not plan.get('points'):
                         plan['points'] = ["Analyzing the impact...", "Key highlights and significance...", "Historical context..."]
+
+                # 3. Visual Sourcing — ALWAYS AI-GENERATED for Copyright Safety
+                print(f"DEBUG: Sourcing carousel context for AI reconstruction...")
+                source_image_url = await NewsFetcher.extract_hero_image(source_url)
+                
+                # --- IMPROVED CONTEXT: Analysis of source image if available ---
+                image_analysis = ""
+                if source_image_url and not source_image_url.startswith("/"):
+                    try:
+                        async with httpx.AsyncClient() as client:
+                            resp = await client.get(source_image_url, timeout=10)
+                            if resp.status_code == 200:
+                                tmp_path = os.path.join(OUTPUT_DIR, f"tmp_expl_{idx}_{datetime.now().strftime('%H%M%S')}.jpg")
+                                with open(tmp_path, "wb") as f: f.write(resp.content)
+                                
+                                print(f"DEBUG: Performing Hyper-Detailed Character Analysis for accuracy...")
+                                analysis_prompt = (
+                                    f"TASK: Create a hyper-accurate visual fingerprint of the protagonist: {plan.get('character_name', topic)}.\n"
+                                    "Analyze and describe in extreme detail:\n"
+                                    "1. Precise facial features, hair style, and ethnicity.\n"
+                                    "2. Exact clothing, accessories, and posture.\n"
+                                    "3. Environmental lighting and photographic style (e.g. 'Golden hour news portrait').\n"
+                                    "This description MUST allow an AI to perfectly replicate the likeness of the person."
+                                )
+                                image_analysis = await self.summarizer.client.analyze_image(tmp_path, analysis_prompt)
+                                os.remove(tmp_path)
+                    except Exception as ae:
+                        print(f"DEBUG: Carousel source analysis skipped: {ae}")
+
+                # --- NEW: Identity Fallback if no image analysis was possible ---
+                if not image_analysis and plan.get('character_name'):
+                    print(f"DEBUG: Scraper failed. Generating AI physical blueprint for: {plan['character_name']}")
+                    fallback_prompt = (
+                        f"Describe the physical appearance of {plan['character_name']} in extreme photographic detail. "
+                        "Focus on facial structure, hair, ethnicity, and common attire. "
+                        "This description will be used to generate a photorealistic AI likeness."
+                    )
+                    image_analysis = await self._gcp_request(fallback_prompt)
+
+                # Refine prompt with analysis
+                imagen_prompt = (
+                    f"CRITICAL IDENTITY: {plan.get('character_name', topic)}. "
+                    f"A professional photorealistic portrait of {plan.get('character_name', topic)}. "
+                    f"Visual Details: {image_analysis}. "
+                    f"Context: {plan.get('headline')}. "
+                    "Cinematic news photography, 8k, ultra-realistic, highly detailed likeness, "
+                    "professional journalism aesthetic, dramatic soft lighting, shallow depth of field, centered composition."
+                )
                 
                 final_image_url = None
-                
-                # Check for hero image from source first
-                try:
-                    hero_url = await NewsFetcher.extract_hero_image(source_url)
-                    if hero_url: final_image_url = hero_url
-                except: print("DEBUG: Hero extraction failed.")
-
-                if visual_strategy == 'AI_GENERATE':
-                    print(f"DEBUG: Strategic Choice: Generating high-quality AI photo for '{topic}'")
-                    try:
-                        imagen_prompt = (
-                            f"Cinematic editorial photography: {plan.get('character_name', topic)}. "
-                            f"{plan.get('headline')}. Professional news studio background, dramatic soft lighting, "
-                            "shallow depth of field, 8k, ultra-realistic, highly detailed, premium journalism aesthetic."
-                        )
-                        img_bytes = await self.summarizer.client.generate_image(imagen_prompt, aspect_ratio="4:5")
-                        if img_bytes:
-                            imagen_filename = f"strategic_imagen_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
-                            imagen_path = os.path.join(OUTPUT_DIR, imagen_filename)
-                            with open(imagen_path, "wb") as f:
-                                f.write(img_bytes)
-                            final_image_url = f"/static/output/{imagen_filename}"
-                    except: print("DEBUG: Strategic AI generation failed, falling back to search.")
-
-                if not final_image_url:
-                    # Web Search Fallback
-                    try:
-                        search_results = await NewsFetcher.search_image(f"{plan['character_name']} news photo", count=3)
-                        final_image_url = search_results[0] if search_results else None
-                    except: print("DEBUG: Web search failed.")
-
-                # Process Cutout with Smart Framing
-                layout = plan.get('layout', 'ASIDE')
                 image_base64 = None
+                is_ai_image = True
+                
+                try:
+                    print(f"DEBUG: Generating dramatic AI image for carousel slide with Imagen 3.0...")
+                    img_bytes = await self.summarizer.client.generate_image(imagen_prompt, aspect_ratio=aspect_ratio)
+                    if img_bytes:
+                        imagen_filename = f"gen_expl_{idx}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
+                        save_path = os.path.join(OUTPUT_DIR, imagen_filename)
+                        with open(save_path, "wb") as f:
+                            f.write(img_bytes)
+                        final_image_url = f"/static/output/{imagen_filename}"
+                        image_base64 = base64.b64encode(img_bytes).decode()
+                except Exception as e:
+                    print(f"❌ GCP Carousel Image Error: {e}")
+                    statuses.append(f"Image Gen failed for item {idx+1}")
+                    continue
+                # 4. Process for Rendering (NO CUTOUTS as requested)
+                # We use the full-frame image_base64
                 cutout_base64 = None
                 secondary_cutout_base64 = None
+                layout = plan.get('layout', 'ASIDE')
                 
-                if final_image_url:
-                    try:
-                        # 1. Download and get raw Base64
-                        if final_image_url.startswith("/static/output/"):
-                            local_path = os.path.join(OUTPUT_DIR, os.path.basename(final_image_url))
-                            with open(local_path, "rb") as f:
-                                raw_img_bytes = f.read()
-                        else:
-                            async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as dl:
-                                resp = await dl.get(final_image_url)
-                                raw_img_bytes = resp.content
-                        
-                        image_base64 = base64.b64encode(raw_img_bytes).decode()
-                        
-                        # 2. Generate Cutout
-                        if is_person:
-                            try:
-                                from PIL import Image
-                                from rembg import remove
-                                input_img = Image.open(io.BytesIO(raw_img_bytes))
-                                cutout_img = remove(input_img)
-                                framed_img = self.frame_character(cutout_img, layout=layout)
-                                buffered = io.BytesIO()
-                                framed_img.save(buffered, format="PNG")
-                                cutout_base64 = base64.b64encode(buffered.getvalue()).decode()
-                                
-                                # 2b. Secondary Character for Dual-Hero
-                                secondary_name = plan.get('secondary_character')
-                                if secondary_name:
-                                    print(f"DEBUG: Processing Secondary Character: {secondary_name}")
-                                    s_search = await NewsFetcher.search_image(f"{secondary_name} official portrait", count=1)
-                                    if s_search:
-                                        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as s_dl:
-                                            s_resp = await s_dl.get(s_search[0])
-                                            s_img = Image.open(io.BytesIO(s_resp.content))
-                                            s_cutout = remove(s_img)
-                                            # We use 'CENTERED' for secondary insets
-                                            s_framed = self.frame_character(s_cutout, layout='CENTERED')
-                                            s_buf = io.BytesIO()
-                                            s_framed.save(s_buf, format="PNG")
-                                            secondary_cutout_base64 = base64.b64encode(s_buf.getvalue()).decode()
-                                            print("DEBUG: Secondary Cutout OK.")
-                            except Exception as cut_err:
-                                print(f"DEBUG: Cutout failed: {cut_err}")
-                    except Exception as b64_err:
-                        print(f"DEBUG: Image prep failed: {b64_err}")
+                slide_paths = []
+                total_slides = len(plan.get('points', [])) + 1
 
                 # 4. Rendering Multi-Slide Carousel
                 timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -305,8 +295,10 @@ class ExplainerEngine:
                 is_person = plan.get('subject_type', 'PERSON') == 'PERSON'
                 theme = plan.get('theme', 'POLITICS').upper()
                 points = plan.get('points', [])
-                total_slides = len(points) + 1
-                slide_paths = []
+                # Determine dimensions
+                width, height = 1080, 1350
+                if aspect_ratio == "9:16":
+                    height = 1920
 
                 # --- SLIDE 1: COVER ---
                 cover_filename = os.path.join("carousels", carousel_id, "slide_01.jpg")
@@ -330,12 +322,12 @@ class ExplainerEngine:
                     "language": language,
                     "slide_index": 1,
                     "total_slides": total_slides,
-                    "view_height": 1350, # Force 4:5
+                    "view_height": height,
                     "theme": theme,
                     "is_cover": True
                 }
                 
-                path = await engine.render_post(render_data_cover, template_str, cover_filename, 1080, 1350, aspect_ratio="4:5")
+                path = await engine.render_post(render_data_cover, template_str, cover_filename, width, height, aspect_ratio=aspect_ratio)
                 if path: slide_paths.append(path)
 
                 # --- SLIDES 2+: POINTS ---
@@ -359,12 +351,12 @@ class ExplainerEngine:
                         "language": language,
                         "slide_index": slide_num,
                         "total_slides": total_slides,
-                        "view_height": 1350,
+                        "view_height": height,
                         "theme": theme,
                         "is_cover": False
                     }
 
-                    path = await engine.render_post(render_data_point, point_template_str, point_filename, 1080, 1350, aspect_ratio="4:5")
+                    path = await engine.render_post(render_data_point, point_template_str, point_filename, width, height, aspect_ratio=aspect_ratio)
                     if path: slide_paths.append(path)
 
                 if slide_paths:
@@ -391,7 +383,7 @@ class ExplainerEngine:
 
         return results, " | ".join(statuses)
 
-    async def generate_quote_post(self, topic, language="english"):
+    async def generate_quote_post(self, topic, language="english", aspect_ratio="9:16"):
         """Generates a standalone, single-image premium Quote post."""
         items = NewsFetcher.fetch_by_topic(topic, count=1)
         if not items: return None, "No news found"
@@ -399,6 +391,7 @@ class ExplainerEngine:
         item = items[0]
         news_text = f"{item['title']} {item['summary']}"
         source_url = item['link']
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         
         # 1. Plan Visuals
         plan, _ = await self.plan_explainer(topic, news_text, language=language)
@@ -414,45 +407,71 @@ class ExplainerEngine:
         )
         detailed_caption = caption_data.get('caption', f"{plan.get('headline', topic)}\n\n{news_text}")
         
-        # 3. Image Sourcing
+        # 3. Image Sourcing (ALWAYS AI-GENERATED for Quotes)
+        print(f"DEBUG: Sourcing quote context for AI reconstruction...")
+        source_image_url = await NewsFetcher.extract_hero_image(item['link'])
+        
+        # --- IMPROVED CONTEXT: Analysis of source image if available ---
+        image_analysis = ""
+        if source_image_url and not source_image_url.startswith("/"):
+            try:
+                async with httpx.AsyncClient() as client:
+                    resp = await client.get(source_image_url, timeout=10)
+                    if resp.status_code == 200:
+                        tmp_path = os.path.join(OUTPUT_DIR, f"tmp_quote_{timestamp}.jpg")
+                        with open(tmp_path, "wb") as f: f.write(resp.content)
+                        
+                        print(f"DEBUG: Performing Hyper-Detailed Portrait Analysis for Quote Accuracy...")
+                        analysis_prompt = (
+                            f"TASK: Create a hyper-accurate facial and upper-body fingerprint of: {plan.get('character_name', topic)}.\n"
+                            "IGNORE THE BACKGROUND. Focus ONLY on:\n"
+                            "1. Precise facial features, hair style, and ethnicity.\n"
+                            "2. Clothing details and posture.\n"
+                            "This description MUST allow an AI to perfectly replicate the subject as a close-up portrait."
+                        )
+                        image_analysis = await self.summarizer.client.analyze_image(tmp_path, analysis_prompt)
+                        os.remove(tmp_path)
+            except Exception as ae:
+                print(f"DEBUG: Quote source analysis skipped: {ae}")
+
+        # --- NEW: Identity Fallback if no image analysis was possible ---
+        if not image_analysis and plan.get('character_name'):
+            print(f"DEBUG: Scraper failed. Generating AI physical blueprint for Quote: {plan['character_name']}")
+            fallback_prompt = (
+                f"Describe the facial features and hair of {plan['character_name']} in extreme photographic detail. "
+                "This description will be used to generate a photorealistic close-up AI headshot."
+            )
+            image_analysis = await self._gcp_request(fallback_prompt)
+
+        # Refine prompt with analysis
+        image_prompt = (
+            f"CRITICAL IDENTITY: {plan.get('character_name', topic)}. "
+            f"A photorealistic professional CLOSE-UP news portrait of {plan.get('character_name', topic)}. "
+            f"Likeness Details: {image_analysis}. "
+            f"Style: {theme} theme, high impact, documentary photography. "
+            "8k, ultra-realistic, dramatic cinematic lighting, CENTERED CLOSE-UP, highly detailed face."
+        )
+        
         final_image_url = None
-        try:
-            hero_url = await NewsFetcher.extract_hero_image(source_url)
-            if hero_url: final_image_url = hero_url
-        except: pass
-        
-        if not final_image_url:
-            try:
-                search_results = await NewsFetcher.search_image(f"{plan['character_name']} high quality news photo", count=1)
-                final_image_url = search_results[0] if search_results else None
-            except: pass
-            
-        # 4. Process Cutout
-        cutout_base64 = None
         image_base64 = None
+        is_ai_image = True
         
-        if final_image_url:
-            try:
-                if final_image_url.startswith("/static/output/"):
-                    local_path = os.path.join(OUTPUT_DIR, os.path.basename(final_image_url))
-                    with open(local_path, "rb") as f:
-                        raw_img_bytes = f.read()
-                else:
-                    async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as dl:
-                        resp = await dl.get(final_image_url)
-                        raw_img_bytes = resp.content
-                
-                image_base64 = base64.b64encode(raw_img_bytes).decode()
-                
-                # Cutout
-                out_bytes = remove(raw_img_bytes)
-                img = Image.open(io.BytesIO(out_bytes)).convert("RGBA")
-                framed = self.frame_character(img, layout="CENTERED")
-                buf = io.BytesIO()
-                framed.save(buf, format="PNG")
-                cutout_base64 = base64.b64encode(buf.getvalue()).decode()
-            except Exception as e:
-                print(f"Quote Cutout Error: {e}")
+        try:
+            print(f"DEBUG: Generating cinematic background for quote with Imagen 3.0...")
+            img_data = await self.summarizer.client.generate_image(image_prompt, aspect_ratio=aspect_ratio)
+            if img_data:
+                imagen_filename = f"gen_quote_{timestamp}.jpg"
+                save_path = os.path.join(OUTPUT_DIR, imagen_filename)
+                with open(save_path, "wb") as f:
+                    f.write(img_data)
+                final_image_url = f"/static/output/{imagen_filename}"
+                image_base64 = base64.b64encode(img_data).decode()
+        except Exception as e:
+            print(f"❌ GCP Quote Image Error: {e}")
+            return None, f"Image Generation Failed: {e}"
+
+        # 4. Process for Rendering (NO CUTOUTS as requested)
+        cutout_base64 = None
         
         # 5. Render
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -462,17 +481,22 @@ class ExplainerEngine:
         with open(template_path, 'r') as f:
             template_str = f.read()
             
+        # Determine dimensions
+        width, height = 1080, 1350
+        if aspect_ratio == "9:16":
+            height = 1920
+
         render_data = {
             **plan,
             "original_image": f"data:image/jpeg;base64,{image_base64}" if image_base64 else final_image_url,
             "cutout_image": cutout_base64,
-            "view_height": 1350,
+            "view_height": height, 
             "theme": theme
         }
         
         from glue import InstagramEngine
         engine = InstagramEngine()
-        path = await engine.render_post(render_data, template_str, quote_filename, 1080, 1350, aspect_ratio="4:5")
+        path = await engine.render_post(render_data, template_str, quote_filename, width, height, aspect_ratio=aspect_ratio)
         
         if path:
             from qa_agent import QAAgent

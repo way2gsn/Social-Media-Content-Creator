@@ -30,7 +30,7 @@ api_uploader = InstagramAPIEngine()
 
 DB_PATH = os.path.join(BACKEND_DIR, "automation.db")
 # Backend Version (Must match UI version)
-VERSION = "2.0.0" # Cinematic Documentary Engine Upgrade
+VERSION = "2.1.0" # Neural Mobile Engine Upgrade
 
 app = FastAPI()
 
@@ -65,6 +65,7 @@ async def startup_event():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('full_auto', 'false')")
+    c.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('auto_schedule', 'true')")
     conn.commit()
     conn.close()
     
@@ -205,49 +206,49 @@ async def get_version():
 
 @app.get("/gallery")
 async def get_gallery():
-    posts = DatabaseManager.get_all_posts() if hasattr(DatabaseManager, 'get_all_posts') else []
+    posts = DatabaseManager.get_all_posts()
     return JSONResponse({"posts": posts})
 
-# ─── 1. STANDARD POST (4:5, template-based) ─────────────────────────
+# ─── 1. STANDARD POST (4:5 or 9:16) ─────────────────────────
 @app.post("/generate")
-async def generate_endpoint(topics: str = Form(...), count: int = Form(5), language: str = Form("english"), background_tasks: BackgroundTasks = None):
+async def generate_endpoint(topics: str = Form(...), count: int = Form(5), language: str = Form("english"), aspect_ratio: str = Form("4:5"), background_tasks: BackgroundTasks = None):
     task_id = str(uuid.uuid4())[:8]
     topic_list = [t.strip() for t in topics.split(",")]
     tasks[task_id] = {
         "status": "Fetching news...",
         "progress": 0,
-        "logs": [f"Initialized Standard Post for {topics} ({language})"],
+        "logs": [f"Initialized Standard Post ({aspect_ratio}) for {topics}"],
         "results": []
     }
-    background_tasks.add_task(generate_standard_batch, task_id, topic_list, count, language)
+    background_tasks.add_task(generate_standard_batch, task_id, topic_list, count, language, aspect_ratio)
     return {"task_id": task_id}
 
-# ─── 2. CAROUSEL (4:5, multi-slide, template-based) ─────────────────
+# ─── 2. CAROUSEL (4:5 or 9:16) ─────────────────
 @app.post("/generate-carousel")
-async def generate_carousel_endpoint(topics: str = Form(...), count: int = Form(1), language: str = Form("english"), background_tasks: BackgroundTasks = None):
+async def generate_carousel_endpoint(topics: str = Form(...), count: int = Form(1), language: str = Form("english"), aspect_ratio: str = Form("4:5"), background_tasks: BackgroundTasks = None):
     task_id = str(uuid.uuid4())[:8]
     topic_list = [t.strip() for t in topics.split(",")]
     tasks[task_id] = {
         "status": "Starting Carousel Engine...",
         "progress": 0,
-        "logs": [f"Initialized Carousel for {topics} ({language})"],
+        "logs": [f"Initialized Carousel ({aspect_ratio}) for {topics}"],
         "results": []
     }
-    background_tasks.add_task(run_carousel_generation, task_id, topic_list, language, count)
+    background_tasks.add_task(run_carousel_generation, task_id, topic_list, language, count, aspect_ratio)
     return {"task_id": task_id}
 
-# ─── 3. QUOTE POST (4:5, single-slide, template-based) ───────────────
+# ─── 3. QUOTE POST (4:5 or 9:16) ───────────────
 @app.post("/generate-quote")
-async def generate_quote_endpoint(topics: str = Form(...), language: str = Form("english"), background_tasks: BackgroundTasks = None):
+async def generate_quote_endpoint(topics: str = Form(...), language: str = Form("english"), aspect_ratio: str = Form("9:16"), background_tasks: BackgroundTasks = None):
     task_id = str(uuid.uuid4())[:8]
     topic_list = [t.strip() for t in topics.split(",")]
     tasks[task_id] = {
         "status": "Starting Quote Engine...",
         "progress": 0,
-        "logs": [f"Initialized Premium Quote for {topics} ({language})"],
+        "logs": [f"Initialized Premium Quote ({aspect_ratio}) for {topics}"],
         "results": []
     }
-    background_tasks.add_task(run_quote_generation, task_id, topic_list, language)
+    background_tasks.add_task(run_quote_generation, task_id, topic_list, language, aspect_ratio)
     return {"task_id": task_id}
 
 # ─── 4. CINEMATIC VIDEO (9:16, AI script, Veo, TTS) ────────────
@@ -365,7 +366,7 @@ async def delete_audio_endpoint(filename: str):
 
 # ─── BACKGROUND WORKERS ──────────────────────────────────────────────
 
-async def generate_standard_batch(task_id, topics, count, language):
+async def generate_standard_batch(task_id, topics, count, language, aspect_ratio="4:5"):
     engine = InstagramEngine()
     musicalizer = Musicalizer()
     settings = DatabaseManager.get_settings()
@@ -392,11 +393,16 @@ async def generate_standard_batch(task_id, topics, count, language):
             topic = item.get('title', topics[0] if topics else "News")
             update_task(task_id, f"Processing {i+1}/{len(items)}: {topic[:40]}...", progress, [f"Rendering: {topic}"])
             
-            # Wrap each post in a timeout
+            # Wrap each post in a timeout (Increased to 600s to allow for backoffs)
             async def generate_with_timeout():
-                return await engine.generate_standard_post(item, topic, language=language)
+                return await engine.generate_standard_post(item, topic, aspect_ratio=aspect_ratio, language=language)
             
-            path = await asyncio.wait_for(generate_with_timeout(), timeout=120)
+            path = await asyncio.wait_for(generate_with_timeout(), timeout=600)
+            
+            # MANDATORY DELAY: 2 minutes between every generation as requested
+            if i < len(items) - 1:
+                update_task(task_id, f"Resting for 2 mins...", progress + 2, [f"Delay: Waiting 120s before next post for stability..."])
+                await asyncio.sleep(120)
             
             # Musicalization
             if use_music and path:
@@ -423,23 +429,29 @@ async def generate_standard_batch(task_id, topics, count, language):
     
     update_task(task_id, "Success", 100, ["Batch complete! Check gallery."])
 
-async def run_carousel_generation(task_id, topics, language, count=1):
+async def run_carousel_generation(task_id, topics, language, count=1, aspect_ratio="4:5"):
     try:
         total = len(topics)
         completed = 0
         for topic in topics:
             update_task(task_id, f"Planning carousel for {topic}...", int((completed / total) * 100), [f"Starting carousel analysis for '{topic}'"])
-            paths, status_msg = await explainer_engine.generate_explainer(topic, aspect_ratio="4:5", language=language, count=count)
+            paths, status_msg = await explainer_engine.generate_explainer(topic, aspect_ratio=aspect_ratio, language=language, count=count)
             update_task(task_id, f"Rendering carousel...", int(((completed + 0.5) / total) * 100), [f"Engine: {status_msg}"])
             if paths:
                 if task_id in tasks: tasks[task_id]["results"].extend(paths)
                 update_task(task_id, f"Carousel complete", int(((completed + 1) / total) * 100), [f"{len(paths)} slides rendered successfully."])
+            
+            # MANDATORY DELAY: 2 minutes between every carousel item as requested
+            if completed < total - 1:
+                update_task(task_id, "Resting for 2 mins...", int(((completed + 1) / total) * 100), ["Delay: Waiting 120s before next carousel for stability..."])
+                await asyncio.sleep(120)
+
             completed += 1
         update_task(task_id, "Success", 100, ["Carousel batch complete!"])
     except Exception as e:
         update_task(task_id, "Error", 0, [f"CRITICAL ERROR: {str(e)}"])
 
-async def run_quote_generation(task_id, topics, language):
+async def run_quote_generation(task_id, topics, language, aspect_ratio="9:16"):
     try:
         from glue import Musicalizer, DatabaseManager, STATIC_DIR
         import os
@@ -454,7 +466,7 @@ async def run_quote_generation(task_id, topics, language):
         completed = 0
         for topic in topics:
             update_task(task_id, f"Planning quote for {topic}...", int((completed / total) * 100), [f"Starting quote analysis for '{topic}'"])
-            path, status_msg = await explainer_engine.generate_quote_post(topic, language=language)
+            path, status_msg = await explainer_engine.generate_quote_post(topic, language=language, aspect_ratio=aspect_ratio)
             update_task(task_id, f"Rendering quote...", int(((completed + 0.5) / total) * 100), [f"Engine: {status_msg}"])
             
             if path:
@@ -512,18 +524,6 @@ async def run_cinematic_generation(task_id, topics):
     except Exception as e:
         update_task(task_id, "Error", 0, [f"CRITICAL ERROR: {str(e)}"])
 
-# DB patch
-def patch_db_manager():
-    def get_all_posts():
-        conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row
-        c = conn.cursor()
-        c.execute("SELECT * FROM posts ORDER BY created_at DESC")
-        rows = [dict(row) for row in c.fetchall()]
-        conn.close()
-        return rows
-    DatabaseManager.get_all_posts = staticmethod(get_all_posts)
-
 # ─── AUTONOMOUS FULL-AUTO ENGINE ──────────────────────────────────────
 
 class AutonomousAutomation:
@@ -537,7 +537,7 @@ class AutonomousAutomation:
         print("🤖 [AUTONOMOUS] Starting Full-Auto Content Cycle...")
         engine = InstagramEngine()
         musicalizer = Musicalizer()
-        from datetime import datetime
+        from datetime import datetime, timedelta
         
         # 1. Determine topics (Trending news / Specific Niches)
         topics = [
@@ -549,49 +549,68 @@ class AutonomousAutomation:
         ]
         random.shuffle(topics)
         
-        # 2. Cycle Strategy: Generate a mix to reach 10 posts/5 reels per day
-        post_count = random.choice([2, 3])
-        
+        # 2. Daily Content Strategy Mix (Deterministic 24-hour Cycle)
+        # Goal: 1x 4:5, 3x 9:16 (Std/Quote), 2x Reels
+        current_hour = datetime.now().hour
+        generation_tasks = []
+
+        # Define what to generate based on the 6-hour cycle
+        if 0 <= current_hour < 6:
+            # Cycle 1: 1 Reel + 2 Standard (9:16)
+            generation_tasks = [("REEL", "9:16"), ("STANDARD", "9:16"), ("STANDARD", "9:16")]
+        elif 6 <= current_hour < 12:
+            # Cycle 2: 1 Reel + 2 Standard (4:5)
+            generation_tasks = [("REEL", "9:16"), ("STANDARD", "4:5"), ("STANDARD", "4:5")]
+        elif 12 <= current_hour < 18:
+            # Cycle 3: 1 Reel + 2 Standard (9:16) + 1 Quote (9:16)
+            generation_tasks = [("REEL", "9:16"), ("STANDARD", "9:16"), ("STANDARD", "9:16"), ("QUOTE", "9:16")]
+        else:
+            # Cycle 4: 2 Standard (9:16) + 1 Quote (9:16)
+            generation_tasks = [("STANDARD", "9:16"), ("STANDARD", "9:16"), ("QUOTE", "9:16")]
+
         generated_assets = [] 
         
-        # Generate Content Mix (Standard, Quote, or Cinematic Reel)
-        items = NewsFetcher.fetch_batch(topics[:3], count=post_count + 1)
-        for item in items:
+        # Process Tasks
+        items = NewsFetcher.fetch_batch(topics[:len(generation_tasks) + 1], count=len(generation_tasks))
+        for i, task in enumerate(generation_tasks):
             try:
-                # Content Strategy Mix:
-                # 25% chance for Cinematic Reel (Professional Documentary)
-                # 25% chance for Premium Quote
-                # 50% chance for Standard Post
-                roll = random.random()
+                task_type, aspect_ratio = task
+                item = items[i] if i < len(items) else items[0]
                 
-                if roll < 0.25:
-                    print(f"🤖 [AUTONOMOUS] Generating Cinematic Reel for: {item['title']}")
+                # Intelligent Format Override: Check if news is a "Big Statement"
+                is_quote_worthy = await AISummarizer.is_quote_worthy(item['title'], item['summary'])
+                if is_quote_worthy and task_type == "STANDARD":
+                    print(f"🤖 [AUTONOMOUS] Intelligence: Significant Statement detected. Overriding STANDARD -> QUOTE for '{item['title']}'")
+                    task_type = "QUOTE"
+                    aspect_ratio = "9:16" # Quote posts are always 9:16 vertical
+                
+                print(f"🤖 [AUTONOMOUS] Cycle Task: Generating {task_type} ({aspect_ratio}) for: {item['title']}")
+                path = None
+                
+                if task_type == "REEL":
                     cine_engine = CinematicVideoEngine()
                     path, _ = await cine_engine.generate_video(item['title'])
-                elif roll < 0.50:
-                    print(f"🤖 [AUTONOMOUS] Generating Premium Quote for: {item['title']}")
+                elif task_type == "QUOTE":
+                    # Aspect ratio is handled inside generate_quote_post now (set to 9:16)
                     path, _ = await explainer_engine.generate_quote_post(item['title'], language="english")
                 else:
-                    print(f"🤖 [AUTONOMOUS] Generating Standard Post for: {item['title']}")
-                    path = await engine.generate_standard_post(item, item['title'], language="english")
+                    # Standard Post - We pass aspect ratio
+                    path = await engine.generate_standard_post(item, item['title'], language="english", aspect_ratio=aspect_ratio)
                 
                 if path:
-                    # For non-cinematic posts, check if we should musicalize
-                    is_cine = "output/cine_" in path
-                    if not is_cine:
+                    # Musicalize if not a video
+                    is_video = path.endswith((".mp4", ".mov"))
+                    if not is_video:
                         tracks = musicalizer.get_tracks()
                         abs_path = os.path.join(STATIC_DIR, "output", os.path.basename(path))
                         if tracks:
                             v_file, _ = await musicalizer.create_reel(abs_path, random.choice(tracks))
                             if v_file: path = v_file
                     
-                    # 4. Save to DB & Get post_id for scheduling
-                    # We use save_post here if it's not already saved by the engine
-                    if is_cine:
-                        caption = script_data.get('instagram_caption', 'Autogenerated pro documentary')
-                        DatabaseManager.save_post(
-                            item['title'], f"Pro Documentary: {item['title']}", "Cinematic", caption, os.path.basename(path), "Cinematic Studio"
-                        )
+                    # Save to DB
+                    DatabaseManager.save_post(
+                        item['title'], f"Auto {task_type}: {item['title']}", task_type, "Autogenerated content", os.path.basename(path), "Autonomous Engine"
+                    )
                     
                     conn = sqlite3.connect(DB_PATH)
                     c = conn.cursor()
@@ -600,9 +619,14 @@ class AutonomousAutomation:
                     if row:
                         generated_assets.append({'id': row[0], 'caption': row[1], 'asset_path': row[2]})
                     conn.close()
-            except Exception as e: print(f"DEBUG: Auto Content Gen Failed: {e}")
+            except Exception as e: print(f"DEBUG: Auto Content Task Failed: {e}")
 
-        # 3. Schedule them randomly
+        # 3. Schedule them randomly if enabled
+        settings = DatabaseManager.get_settings()
+        if settings.get("auto_schedule") != "true":
+            print("🤖 [AUTONOMOUS] Auto-Scheduling is DISABLED. Posts saved to gallery, skipping queue.")
+            return
+
         # Start from 1 hour from now
         current_time = datetime.now() + timedelta(hours=1)
         
@@ -629,8 +653,6 @@ async def autonomous_background_loop():
         
         # Wait 6 hours (21600 seconds)
         await asyncio.sleep(21600)
-
-patch_db_manager()
 
 if __name__ == "__main__":
     import uvicorn

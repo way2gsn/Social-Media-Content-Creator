@@ -103,9 +103,14 @@ export default function Home() {
     checkVersion();
   }, []);
 
+  const [aspectRatio, setAspectRatio] = useState('4:5');
+
   const handleGenerate = async (endpoint: string) => {
     const fd = new FormData();
-    fd.append('topics', topics); fd.append('count', count.toString()); fd.append('language', language);
+    fd.append('topics', topics); 
+    fd.append('count', count.toString()); 
+    fd.append('language', language);
+    fd.append('aspect_ratio', aspectRatio);
     try { const r = await fetch(`${API}${endpoint}`, { method: 'POST', body: fd }); const d = await r.json(); setActiveTask(d.task_id); setActiveTab('create'); } catch {}
   };
 
@@ -136,17 +141,37 @@ export default function Home() {
     }
   };
 
+  const handleShare = async (post: any) => {
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        const imageUrl = `${API}/static/output/${post.asset_path}`;
+        const response = await fetch(imageUrl);
+        const blob = await response.blob();
+        const file = new File([blob], post.asset_path, { type: blob.type });
+        
+        await navigator.share({
+          files: [file],
+          title: post.headline,
+          text: post.caption,
+        });
+      } catch (err) {
+        console.log("Share failed:", err);
+      }
+    } else {
+      alert("Web Share API not supported or no shareable file.");
+    }
+  };
+
   const navItems = [
-    { id: 'create', label: 'Create', icon: Sparkles },
-    { id: 'cinematic', label: 'Cinematic', icon: Play },
+    { id: 'create', label: 'Create', icon: Newspaper },
     { id: 'gallery', label: 'Gallery', icon: History },
-    { id: 'templates', label: 'Templates', icon: Layers },
     { id: 'schedule', label: 'Schedule', icon: Calendar },
+    { id: 'cinematic', label: 'Reels', icon: Play },
   ];
 
   return (
-    <div className="min-h-screen bg-[#05070a] text-slate-200 font-sans selection:bg-amber-500/30">
-      <nav className="fixed left-0 top-0 h-full w-64 bg-[#0a0d14] border-r border-white/5 p-8 flex flex-col z-50">
+    <div className="min-h-screen bg-[#05070a] text-slate-200 font-sans selection:bg-amber-500/30 pb-20 md:pb-0">
+      <nav className="hidden md:flex fixed left-0 top-0 h-full w-64 bg-[#0a0d14] border-r border-white/5 p-8 flex flex-col z-50">
         <div className="mb-12 px-2">
           <h1 className="text-2xl font-black tracking-tighter text-white uppercase italic">Humorously <span className="text-amber-500">Indians</span></h1>
           <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-slate-500 mt-1">AI Content Engine</p>
@@ -177,13 +202,28 @@ export default function Home() {
           <div className="flex items-center gap-3 px-4 py-3 bg-white/5 rounded-2xl border border-white/10">
             <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)] animate-pulse" />
             <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
-              v2.0.0 (Server: {serverVersion})
+              v2.1.0 (Server: {serverVersion})
             </span>
           </div>
         </div>
       </nav>
 
-      <main className="pl-64 p-12 max-w-7xl mx-auto">
+      {/* Mobile Nav */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 h-20 bg-[#0a0d14]/90 backdrop-blur-xl border-t border-white/5 flex items-center justify-around px-4 z-[100]">
+        {navItems.map(n => (
+          <button key={n.id} onClick={() => { setActiveTab(n.id); if(n.id==='schedule') fetchSchedules(); }}
+            className={`flex flex-col items-center gap-1 transition-all ${activeTab===n.id ? 'text-amber-500' : 'text-slate-500'}`}>
+            <n.icon size={20}/>
+            <span className="text-[9px] font-black uppercase tracking-tighter">{n.label}</span>
+          </button>
+        ))}
+        <button onClick={() => { fetchSettings(); setIsSettingsOpen(true); }} className="flex flex-col items-center gap-1 text-slate-500">
+          <Settings size={20}/>
+          <span className="text-[9px] font-black uppercase tracking-tighter">Set</span>
+        </button>
+      </nav>
+
+      <main className="md:pl-64 p-6 md:p-12 max-w-7xl mx-auto">
         {/* ── CREATE TAB ── */}
         {activeTab === 'create' && (
           <div className="space-y-8 animate-in fade-in duration-700">
@@ -224,6 +264,17 @@ export default function Home() {
                 <div className="p-6 rounded-3xl bg-white/[0.02] border border-white/10">
                   <h3 className="text-[10px] uppercase font-black text-slate-500 tracking-[0.2em] mb-6">Config</h3>
                   <div className="space-y-6">
+                    <div>
+                      <label className="text-[9px] uppercase font-bold text-slate-600 mb-3 block">Aspect Ratio</label>
+                      <div className="grid grid-cols-2 bg-black/40 border border-white/5 rounded-xl p-1 gap-1">
+                        {['4:5', '9:16'].map(r => (
+                          <button key={r} onClick={() => setAspectRatio(r)} 
+                            className={`py-2.5 rounded-lg text-[10px] font-black uppercase transition-all ${aspectRatio === r ? 'bg-amber-500 text-black' : 'text-slate-500 hover:text-white'}`}>
+                            {r}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                     <div>
                       <label className="text-[9px] uppercase font-bold text-slate-600 mb-3 block">Language</label>
                       <div className="grid grid-cols-3 bg-black/40 border border-white/5 rounded-xl p-1 gap-1">
@@ -315,15 +366,20 @@ export default function Home() {
                   )}
                   <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex flex-col justify-end p-6">
                     <div className="absolute top-4 right-4 flex gap-2">
+                       <button onClick={(e)=>{e.stopPropagation(); handleShare(p);}} className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-500 hover:bg-amber-500 hover:text-black transition-all shadow-lg">
+                         <Send size={14}/>
+                       </button>
                        <button onClick={(e)=>{e.stopPropagation(); handleDeletePost(p.id);}} className="p-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500 hover:text-white transition-all shadow-lg">
                          <Trash2 size={14}/>
                        </button>
                     </div>
                     <p className="text-[10px] uppercase font-bold text-amber-500 mb-1">{p.topic}</p>
                     <p className="text-sm font-bold text-white line-clamp-2">{p.headline}</p>
-                    <button onClick={(e)=>{e.stopPropagation();setScheduleModal(p);setScheduleTime('');}} className="mt-3 flex items-center gap-2 text-[9px] uppercase font-black tracking-widest text-amber-500 bg-amber-500/10 border border-amber-500/20 px-3 py-2 rounded-lg hover:bg-amber-500 hover:text-black transition-all">
-                      <Calendar size={12}/>Schedule
-                    </button>
+                    <div className="mt-3 flex gap-2">
+                      <button onClick={(e)=>{e.stopPropagation();setScheduleModal(p);setScheduleTime('');}} className="flex-1 flex items-center justify-center gap-2 text-[9px] uppercase font-black tracking-widest text-amber-500 bg-amber-500/10 border border-amber-500/20 px-3 py-2 rounded-lg hover:bg-amber-500 hover:text-black transition-all">
+                        <Calendar size={12}/>Schedule
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -416,12 +472,12 @@ export default function Home() {
 
       {/* ── POST DETAIL MODAL ── */}
       {selectedPost && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/90 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="bg-[#0a0d14] border border-white/10 rounded-[40px] w-full max-w-5xl h-[80vh] flex overflow-hidden shadow-2xl relative">
-            <button onClick={() => setSelectedPost(null)} className="absolute top-8 right-8 z-[110] p-3 bg-white/5 hover:bg-amber-500 hover:text-black rounded-full transition-all">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-6 bg-black/90 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="bg-[#0a0d14] border border-white/10 rounded-[32px] md:rounded-[40px] w-full max-w-5xl h-[90vh] md:h-[80vh] flex flex-col md:flex-row overflow-hidden shadow-2xl relative">
+            <button onClick={() => setSelectedPost(null)} className="absolute top-4 right-4 md:top-8 md:right-8 z-[110] p-3 bg-white/5 hover:bg-amber-500 hover:text-black rounded-full transition-all">
                 <Trash2 size={20} className="rotate-45"/>
             </button>
-                <div className="flex-1 bg-black flex items-center justify-center relative overflow-hidden group">
+                <div className="w-full md:flex-1 bg-black flex items-center justify-center relative overflow-hidden group min-h-[40vh] md:min-h-0">
                   {selectedPost.asset_path.endsWith('.mp4') ? (
                     <video 
                       src={selectedPost.asset_path.startsWith('http') ? selectedPost.asset_path : `${API}/static/output/${selectedPost.asset_path.replace('static/output/', '').replace(/^\/+/, '')}`} 
@@ -433,20 +489,13 @@ export default function Home() {
                       src={selectedPost.asset_path.startsWith('http') ? selectedPost.asset_path : `${API}/static/output/${selectedPost.asset_path.replace('static/output/', '').replace(/^\/+/, '')}`} 
                       alt={selectedPost.headline} 
                       className="max-h-full max-w-full object-contain"
-                      onError={(e) => {
-                        // Final fallback for local development if the API prefix is causing issues
-                        const target = e.target as HTMLImageElement;
-                        if (!target.src.includes('localhost:3000')) {
-                           target.src = `/static/output/${selectedPost.asset_path.replace('static/output/', '').replace(/^\/+/, '')}`;
-                        }
-                      }}
                     />
                   )}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-8">
                     <p className="text-white/60 text-[10px] font-mono tracking-tighter truncate">{selectedPost.asset_path}</p>
                   </div>
                 </div>
-            <div className="w-1/2 p-12 flex flex-col overflow-y-auto custom-scrollbar">
+            <div className="w-full md:w-1/2 p-6 md:p-12 flex flex-col overflow-y-auto custom-scrollbar">
               <div className="mb-8">
                   <p className="text-[10px] uppercase font-black text-amber-500 tracking-[0.3em] mb-2">{selectedPost.topic}</p>
                   <h2 className="text-3xl font-black text-white leading-tight uppercase italic">{selectedPost.headline}</h2>
@@ -461,16 +510,21 @@ export default function Home() {
                   <pre className="text-slate-300 whitespace-pre-wrap font-sans text-sm leading-relaxed">{selectedPost.caption}</pre>
                 </div>
               </div>
-              <div className="mt-8 flex gap-4">
-                <button onClick={() => { setScheduleModal(selectedPost); setSelectedPost(null); setScheduleTime(''); }} className="flex-1 py-4 bg-amber-500 text-black font-black uppercase tracking-widest text-[10px] rounded-2xl hover:bg-amber-400 transition-all flex items-center justify-center gap-2">
-                  <Calendar size={14}/>Schedule Post
+              <div className="mt-8 flex flex-wrap gap-3">
+                <button onClick={() => { setScheduleModal(selectedPost); setSelectedPost(null); setScheduleTime(''); }} className="flex-1 py-4 bg-amber-500 text-black font-black uppercase tracking-widest text-[10px] rounded-2xl hover:bg-amber-400 transition-all flex items-center justify-center gap-2 min-w-[140px]">
+                  <Calendar size={14}/>Schedule
                 </button>
-                <button onClick={() => handleDeletePost(selectedPost.id)} className="p-4 bg-red-500/10 text-red-500 border border-red-500/20 rounded-2xl hover:bg-red-500 hover:text-white transition-all" title="Delete Post">
-                  <Trash2 size={20}/>
+                <button onClick={() => handleShare(selectedPost)} className="flex-1 py-4 bg-white/5 text-white border border-white/10 font-black uppercase tracking-widest text-[10px] rounded-2xl hover:bg-white/10 transition-all flex items-center justify-center gap-2 min-w-[140px]">
+                  <Send size={14}/>Share
                 </button>
-                <a href={`${API}/static/output/${selectedPost.asset_path}`} download className="p-4 bg-white/5 text-white rounded-2xl hover:bg-white/10 transition-all">
-                  <Download size={20}/>
-                </a>
+                <div className="flex gap-3 w-full sm:w-auto">
+                  <button onClick={() => handleDeletePost(selectedPost.id)} className="p-4 bg-red-500/10 text-red-500 border border-red-500/20 rounded-2xl hover:bg-red-500 hover:text-white transition-all flex-1 sm:flex-none flex items-center justify-center" title="Delete Post">
+                    <Trash2 size={20}/>
+                  </button>
+                  <a href={`${API}/static/output/${selectedPost.asset_path}`} download className="p-4 bg-white/5 text-white border border-white/10 rounded-2xl hover:bg-white/10 transition-all flex-1 sm:flex-none flex items-center justify-center" title="Download">
+                    <Download size={20}/>
+                  </a>
+                </div>
               </div>
             </div>
           </div>
@@ -544,6 +598,17 @@ export default function Home() {
                   <button onClick={() => saveSettings({full_auto: settings.full_auto === 'true' ? 'false' : 'true'})}
                     className={`w-12 h-6 rounded-full transition-all relative ${settings.full_auto === 'true' ? 'bg-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.5)]' : 'bg-white/10'}`}>
                     <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${settings.full_auto === 'true' ? 'left-7' : 'left-1'}`}/>
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between p-4 bg-white/20 rounded-xl border border-white/5">
+                  <div>
+                    <p className="text-xs font-bold text-white uppercase tracking-wider">Auto-Schedule</p>
+                    <p className="text-[10px] text-slate-500">Automatically add generated posts to queue</p>
+                  </div>
+                  <button onClick={() => saveSettings({auto_schedule: settings.auto_schedule === 'true' ? 'false' : 'true'})}
+                    className={`w-12 h-6 rounded-full transition-all relative ${settings.auto_schedule === 'true' ? 'bg-amber-500' : 'bg-white/10'}`}>
+                    <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${settings.auto_schedule === 'true' ? 'left-7' : 'left-1'}`}/>
                   </button>
                 </div>
 

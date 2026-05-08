@@ -34,6 +34,7 @@ if not os.path.exists(LOGO_PATH):
 
 # Studio Templates Directory
 STUDIO_TEMPLATES_DIR = os.path.join(BACKEND_DIR, "templates", "studio")
+EXPL_TEMPLATES_DIR = os.path.join(BACKEND_DIR, "templates", "explainer")
 
 class DatabaseManager:
     @staticmethod
@@ -71,6 +72,7 @@ class DatabaseManager:
 
     @staticmethod
     def save_post(topic, headline, subtitle, caption, asset_path, source_url):
+        print(f"DEBUG: Saving post to {DB_PATH} | Topic: {topic}")
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         c.execute('''INSERT INTO posts (topic, headline, subtitle, caption, asset_path, source_url)
@@ -141,6 +143,16 @@ class DatabaseManager:
         conn.close()
 
     @staticmethod
+    def get_all_posts():
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+        c.execute("SELECT * FROM posts ORDER BY created_at DESC")
+        posts = [dict(row) for row in c.fetchall()]
+        conn.close()
+        return posts
+
+    @staticmethod
     def get_settings():
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
@@ -160,6 +172,42 @@ class DatabaseManager:
 class AISummarizer:
     def __init__(self):
         self.client = get_gcp_client()
+
+    @staticmethod
+    async def is_quote_worthy(headline, summary):
+        """Intelligently detects if a news item is a significant statement from a key figure."""
+        try:
+            from gcp_client import GCPClient
+            client = GCPClient()
+            prompt = (
+                "TASK: Determine if this news item is primarily a 'Big Statement' or 'Quote' from a politician, celebrity, or important person.\n"
+                f"HEADLINE: {headline}\n"
+                f"SUMMARY: {summary}\n"
+                "CRITERIA:\n"
+                "1. Does it feature a specific person saying something controversial, significant, or impactful?\n"
+                "2. Is it a 'reaction' or 'assertion' rather than just a general event?\n"
+                "Output ONLY 'TRUE' or 'FALSE'."
+            )
+            res = await client.generate_text(prompt)
+            return "TRUE" in res.upper()
+        except:
+            return False
+
+    async def analyze_image(self, image_path, prompt):
+        """Analyzes an image using Gemini 2.5 GA for hyper-accurate reconstruction context."""
+        try:
+            with open(image_path, "rb") as f:
+                img_data = f.read()
+            
+            # Using the same unified client
+            response = await self.client.generate_text(
+                prompt,
+                images=[img_data]
+            )
+            return response
+        except Exception as e:
+            print(f"DEBUG: Image Analysis Error: {e}")
+            return ""
 
     async def summarize_news(self, title, text, language="english"):
         lang_instruction = f"OUTPUT LANGUAGE: {language}"
@@ -209,22 +257,23 @@ class AISummarizer:
         except: return {"caption": f"{headline}\n\n{subtitle}"}
 
     async def generate_search_query(self, title, text):
-        prompt = (f"Based on this news: {title} {text}, create an image search strategy.\n"
+        prompt = (f"Based on this news: {title} {text}, create an image strategy for a premium news agency.\n"
                   "1. 'query': A 3-5 word search query for a REAL PHOTOGRAPH.\n"
                   "2. 'visual_ideal': A short description of what the photograph SHOULD contain (e.g. 'Person at a podium', 'Currency notes').\n"
                   "3. 'protagonist': The main person mentioned (e.g. 'Narendra Modi'). If no person, leave empty.\n"
-                  "4. 'imagen_prompt': A detailed, cinematic prompt for AI image generation as a fallback. Describe lighting, style, and composition.\n"
-                  "Return strictly VALID JSON with keys 'query', 'visual_ideal', 'protagonist', 'imagen_prompt'.")
+                  "4. 'imagen_prompt': A detailed, cinematic prompt for Imagen 3.0. "
+                  "Describe high-impact news photography, dramatic lighting, shallow depth of field, 8k, ultra-realistic, highly detailed, professional journalism aesthetic. "
+                  "Ensure the subject is CLEARLY IDENTIFIABLE and the scene is dramatic.")
         
         result = await self.client.generate_text(prompt)
         try:
             data = json.loads(result)
-            prompt = data.get('imagen_prompt', title)
+            img_prompt = data.get('imagen_prompt', title)
             # Force centered composition for better framing
-            if "centered" not in prompt.lower():
-                prompt += ", centered composition, subject in center of frame"
-            return data.get('query', title), data.get('visual_ideal', title), data.get('protagonist', ""), prompt
-        except: return title, title, "", f"{title}, centered composition"
+            if "centered" not in img_prompt.lower():
+                img_prompt += ", centered composition, subject in center of frame"
+            return data.get('query', title), data.get('visual_ideal', title), data.get('protagonist', ""), img_prompt
+        except: return title, title, "", f"Professional cinematic news photography of {title}, dramatic lighting, 8k, centered composition"
 
     async def generate_satire(self, topic, news_context="", language="english"):
         lang_instruction = f"OUTPUT LANGUAGE: {language}"
@@ -256,46 +305,57 @@ class AISummarizer:
 class NewsFetcher:
     @staticmethod
     async def extract_hero_image(url):
-        """Advanced Image Scraper: Navigates to news link and finds the hero image."""
+        """Advanced Image Scraper with Retries and Cleanup."""
         print(f"DEBUG: Starting hero extraction for {url}")
-        try:
-            async with async_playwright() as p:
-                browser = await p.chromium.launch(
-                    headless=True,
-                    args=["--no-sandbox", "--disable-dev-shm-usage", "--allow-file-access-from-files", "--disable-web-security"]
-                )
-                context = await browser.new_context(user_agent="Mozilla/5.0 (iPhone; CPU iPhone OS 14_7_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Mobile/15E148 Safari/604.1")
-                page = await context.new_page()
-                await page.goto(url, wait_until='domcontentloaded', timeout=45000)
-                
-                # Redirect loop for Google News
-                try:
-                    for _ in range(5):
+        
+        for attempt in range(2): # Double-Strike Retry
+            browser = None
+            try:
+                async with async_playwright() as p:
+                    browser = await p.chromium.launch(
+                        headless=True,
+                        args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-web-security"]
+                    )
+                    context = await browser.new_context(user_agent="Mozilla/5.0 (iPhone; CPU iPhone OS 14_7_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Mobile/15E148 Safari/604.1")
+                    page = await context.new_page()
+                    
+                    # Faster timeout for first attempt
+                    timeout = 25000 if attempt == 0 else 45000
+                    await page.goto(url, wait_until='domcontentloaded', timeout=timeout)
+                    
+                    # Redirect loop for Google News
+                    for _ in range(3):
                         if "news.google.com" not in page.url: break
                         await asyncio.sleep(1)
-                except: pass
 
-                hero = await page.evaluate("""() => {
-                    const getMeta = (name) => {
-                        const m = document.querySelector(`meta[property="${name}"]`) || 
-                                  document.querySelector(`meta[name="${name}"]`);
-                        return m ? m.content : null;
-                    };
-                    const og = getMeta('og:image') || getMeta('twitter:image');
-                    if (og && og.startsWith('http')) return og;
+                    hero = await page.evaluate("""() => {
+                        const getMeta = (name) => {
+                            const m = document.querySelector(`meta[property="${name}"]`) || 
+                                      document.querySelector(`meta[name="${name}"]`);
+                            return m ? m.content : null;
+                        };
+                        const og = getMeta('og:image') || getMeta('twitter:image');
+                        if (og && og.startsWith('http')) return og;
 
-                    const isLogo = (u) => ['logo', 'icon', 'google', 'placeholder', 'avatar', 'nav'].some(x => u.toLowerCase().includes(x));
-                    const imgs = Array.from(document.querySelectorAll('img'))
-                        .filter(img => img.naturalWidth >= 500 && img.naturalHeight >= 350 && !isLogo(img.src))
-                        .sort((a, b) => (b.naturalWidth * b.naturalHeight) - (a.naturalWidth * a.naturalHeight));
-                    return imgs.length > 0 ? imgs[0].src : null;
-                }""")
-                await browser.close()
-                return hero
-        except Exception as e:
-            print(f"Hero Scrape Error: {e}")
-            return None
-            return None
+                        const isLogo = (u) => ['logo', 'icon', 'google', 'placeholder', 'avatar', 'nav'].some(x => u.toLowerCase().includes(x));
+                        const imgs = Array.from(document.querySelectorAll('img'))
+                            .filter(img => img.naturalWidth >= 500 && img.naturalHeight >= 350 && !isLogo(img.src))
+                            .sort((a, b) => (b.naturalWidth * b.naturalHeight) - (a.naturalWidth * a.naturalHeight));
+                        return imgs.length > 0 ? imgs[0].src : null;
+                    }""")
+                    
+                    if hero:
+                        print(f"DEBUG: Hero image found in attempt {attempt+1}")
+                        return hero
+                    
+            except Exception as e:
+                print(f"Hero Scrape Attempt {attempt+1} Error: {e}")
+            finally:
+                if browser:
+                    try: await browser.close()
+                    except: pass
+                    
+        return None
 
     @staticmethod
     async def search_image(query, headline="", visual_ideal="", count=5):
@@ -501,18 +561,21 @@ class InstagramEngine:
                     datetime=datetime
                 )
                 
-                # Use load + buffer for cloud stability (networkidle can hang on fonts/trackers)
-                print(f"DEBUG: Rendering post with wait_until='load' (Image type: {'Base64' if 'base64' in str(data.get('image_url','')) else 'URL/File'})")
-                await page.set_content(html, wait_until='load', timeout=60000)
-                # Fixed buffer for image painting
+                # Use 'load' to ensure images are fully painted
+                print(f"DEBUG: Rendering post with wait_until='load' (Aspect: {aspect_ratio})")
+                await page.set_content(html, wait_until='load', timeout=30000)
+                print("DEBUG: Content set successfully.")
+                
+                # Fixed buffer for image painting (Increased for stability)
                 await asyncio.sleep(3) 
+                print("DEBUG: Buffer sleep complete. Taking screenshot...")
                 
                 # Use JPEG for better compatibility with Instagram Graph API
                 jpeg_filename = filename.replace(".png", ".jpg")
                 output_path = os.path.join(OUTPUT_DIR, jpeg_filename)
 
-                # Standard 4:5 vertical resolution for maximum Instagram compatibility
-                clip_w, clip_h = 1080, 1350
+                # Dynamic resolution for Instagram compatibility
+                clip_w, clip_h = width, height
                 
                 await page.screenshot(
                     path=output_path, 
@@ -543,38 +606,67 @@ class InstagramEngine:
             return None
 
     async def generate_standard_post(self, item, topic, aspect_ratio="4:5", language="english"):
+        """Generates a high-quality standard post (4:5 or 9:16)."""
         try:
+            # Determine dimensions
+            width, height = 1080, 1350 # Default 4:5
+            if aspect_ratio == "9:16":
+                width, height = 1080, 1920
+
             # 1. Summarize with language
             summary = await self.summarizer.summarize_news(item['title'], item['summary'], language=language)
             if not summary: 
                 print(f"ENGINE: Summary failed for {topic}")
                 return None
             
-            # 2. Image Sourcing
-            image_url = await NewsFetcher.extract_hero_image(item['link'])
+            # 2. Image Sourcing (ALWAYS AI-GENERATED for Copyright Safety)
+            print(f"DEBUG: Sourcing context for AI image reconstruction...")
+            source_image_url = await NewsFetcher.extract_hero_image(item['link'])
             query, visual_ideal, protagonist, imagen_prompt = await self.summarizer.generate_search_query(summary['headline'], item['summary'])
-        
-            is_ai_image = False
-            if not image_url or "google" in image_url.lower():
-                search_results = await NewsFetcher.search_image(query, summary['headline'], visual_ideal)
-                if search_results:
-                    image_url = search_results[0]
-                else:
-                    # GCP FALLBACK: Imagen 3 — triggers "dramatic" mode
-                    print(f"DEBUG: No web image found. Generating dramatic AI image with Imagen 3...")
-                    img_bytes = await self.summarizer.client.generate_image(imagen_prompt, aspect_ratio="4:5")
-                    if img_bytes:
-                        imagen_filename = f"imagen_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
-                        save_path = os.path.join(OUTPUT_DIR, imagen_filename)
-                        with open(save_path, "wb") as f:
-                            f.write(img_bytes)
-                        image_url = f"/static/output/{imagen_filename}"
-                        is_ai_image = True
-                        print(f"DEBUG: AI Image Generated OK ({len(img_bytes)//1024}KB) -> {imagen_filename}")
-                    else:
-                        print("DEBUG: AI Image Generation FAILED (Empty Bytes)")
-        
-            # 2b. Convert image to base64 for reliable Playwright rendering
+            
+            # --- IMPROVED CONTEXT: Analysis of source image if available ---
+            image_analysis = ""
+            if source_image_url and not source_image_url.startswith("/"):
+                try:
+                    # Download briefly to analyze
+                    import httpx
+                    async with httpx.AsyncClient() as client:
+                        resp = await client.get(source_image_url, timeout=10)
+                        if resp.status_code == 200:
+                            tmp_path = os.path.join(OUTPUT_DIR, f"tmp_analysis_{datetime.now().strftime('%H%M%S')}.jpg")
+                            with open(tmp_path, "wb") as f: f.write(resp.content)
+                            
+                            print(f"DEBUG: Analyzing source image for hyper-accurate details...")
+                            analysis_prompt = f"Describe the protagonist, setting, and lighting of this image in dramatic detail for an AI artist. Focus on accuracy: {protagonist}"
+                            image_analysis = await self.summarizer.client.analyze_image(tmp_path, analysis_prompt)
+                            os.remove(tmp_path)
+                except Exception as ae:
+                    print(f"DEBUG: Source analysis skipped: {ae}")
+
+            # Refine prompt with analysis
+            final_prompt = imagen_prompt
+            if image_analysis:
+                final_prompt = f"{imagen_prompt}. Style Details from context: {image_analysis}. Ensure dramatic lighting and hyper-realistic textures."
+
+            # 3. Generate the Final AI Image (Imagen 3.0)
+            print(f"DEBUG: Generating dramatic AI image with Imagen 3.0...")
+            img_bytes = await self.summarizer.client.generate_image(final_prompt, aspect_ratio=aspect_ratio)
+            
+            image_url = None
+            is_ai_image = True
+            
+            if img_bytes:
+                imagen_filename = f"gen_post_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+                save_path = os.path.join(OUTPUT_DIR, imagen_filename)
+                with open(save_path, "wb") as f:
+                    f.write(img_bytes)
+                image_url = f"/static/output/{imagen_filename}"
+                print(f"DEBUG: AI Image Generated OK ({len(img_bytes)//1024}KB) -> {imagen_filename}")
+            else:
+                print(f"❌ FAILURE: AI Image generation failed. Post will have no image.")
+                return None
+            
+            # 4. Convert image to base64 for reliable Playwright rendering
             image_base64 = None
             if image_url:
                 try:
@@ -583,97 +675,39 @@ class InstagramEngine:
                         if os.path.exists(local_path):
                             with open(local_path, "rb") as f:
                                 image_base64 = base64.b64encode(f.read()).decode()
-                            print(f"DEBUG: Local image loaded OK ({len(image_base64)//1024}KB)")
-                        else:
-                            print(f"DEBUG: Local image NOT FOUND: {local_path}")
                     else:
-                        headers = {
-                            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                            "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
-                            "Referer": "https://www.google.com/",
-                            "Accept-Language": "en-US,en;q=0.9"
-                        }
+                        headers = {"User-Agent": "Mozilla/5.0"}
                         async with httpx.AsyncClient(timeout=20.0, headers=headers, follow_redirects=True) as dl:
                             resp = await dl.get(image_url)
-                            # Quality Check: Minimum 40KB for web images, otherwise it's likely a thumbnail
-                            if resp.status_code == 200 and len(resp.content) > 40000:
+                            if resp.status_code == 200:
                                 image_base64 = base64.b64encode(resp.content).decode()
-                                print(f"DEBUG: High-Quality Web image downloaded OK ({len(resp.content)//1024}KB)")
-                            else:
-                                reason = "Too Small" if len(resp.content) <= 40000 else f"Status {resp.status_code}"
-                                print(f"DEBUG: Web image REJECTED ({reason}): size={len(resp.content)} bytes. Triggering AI Fallback.")
-                                # Trigger AI Fallback because web image is low quality
-                                print(f"DEBUG: Generating HD AI alternative for low-quality source...")
-                                img_bytes = await self.summarizer.client.generate_image(imagen_prompt, aspect_ratio="4:5")
-                                if img_bytes:
-                                    imagen_filename = f"imagen_hd_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
-                                    with open(os.path.join(OUTPUT_DIR, imagen_filename), "wb") as f:
-                                        f.write(img_bytes)
-                                    image_base64 = base64.b64encode(img_bytes).decode()
-                                    is_ai_image = True
-                                    print(f"DEBUG: HD AI Replacement Generated OK ({len(img_bytes)//1024}KB)")
                 except Exception as e:
-                    print(f"DEBUG: Image base64 conversion failed: {e}")
-            else:
-                print(f"DEBUG: No image URL available for this post")
-            
-            # Final Image Source Strategy:
-            # 1. Try Base64 (Most reliable for rendering)
-            # 2. Try Local File Path (Fail-safe for GCP permissions)
-            # 3. Fallback to raw URL
-            if image_base64:
-                final_image_src = f"data:image/jpeg;base64,{image_base64}"
-            elif image_url and image_url.startswith("/static/output/"):
-                # Convert relative static path to absolute file URL for Playwright
-                filename_only = os.path.basename(image_url)
-                abs_path = os.path.join(OUTPUT_DIR, filename_only)
-                final_image_src = f"file://{abs_path}"
-                print(f"DEBUG: Using file:// fallback for local asset: {final_image_src}")
-            else:
-                final_image_src = image_url or ""
-            
-            if not final_image_src:
-                print("DEBUG: CRITICAL - final_image_src is EMPTY. Background will be black.")
+                    print(f"DEBUG: Image loading error: {e}")
             
             # 3. Generate Deep Caption
             caption_data = await self.summarizer.generate_deep_caption(summary['headline'], summary['subtitle'], item['summary'])
-            full_caption = caption_data.get('caption', f"{summary['headline']}\n\n{summary['subtitle']}")
             
-            # 4. Template selection — dramatic (AI image) vs standard (web image)
-            if is_ai_image:
-                template_path = os.path.join(STUDIO_TEMPLATES_DIR, "EDITORIAL", "DRAMATIC.html")
-                if not os.path.exists(template_path):
-                    template_path = os.path.join(STUDIO_TEMPLATES_DIR, "EDITORIAL", "POST.html")
-            else:
-                template_path = os.path.join(STUDIO_TEMPLATES_DIR, "EDITORIAL", "POST.html")
-            
+            # 4. Render
+            template_path = os.path.join(EXPL_TEMPLATES_DIR, "EDITORIAL", "MODERN_EDITORIAL.html")
             with open(template_path, 'r') as f:
                 template_str = f.read()
 
-            # 5. Render at 4:5
-            width, height = 1080, 1350
-            filename = f"news_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{os.urandom(4).hex()}.png"
-            path = await self.render_post(
-                {**summary, "image_url": final_image_src, "is_dramatic": is_ai_image},
-                template_str,
-                filename,
-                width=width,
-                height=height,
-                aspect_ratio="4:5"
-            )
-            if path:
-                from qa_agent import QAAgent
-                abs_img_path = os.path.join(STATIC_DIR, "output", os.path.basename(path))
-                is_approved, reason = await QAAgent.validate_post(abs_img_path, topic)
-                if not is_approved:
-                    print(f"🛑 QA REJECTED Standard Post: {topic} | Reason: {reason}")
-                    try:
-                        if os.path.exists(abs_img_path): os.remove(abs_img_path)
-                    except Exception:
-                        pass
-                    return None
+            render_data = {
+                **summary,
+                "image_url": f"data:image/jpeg;base64,{image_base64}" if image_base64 else image_url,
+                "is_ai_image": is_ai_image,
+                "view_height": height
+            }
 
-            DatabaseManager.save_post(topic, summary['headline'], summary['subtitle'], full_caption, path, item['link'])
+            filename = f"post_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
+            path = await self.render_post(render_data, template_str, filename, width=width, height=height, aspect_ratio=aspect_ratio)
+            
+            if path:
+                # Save to database
+                DatabaseManager.save_post(
+                    item['title'], summary['headline'], "Standard", caption_data.get('caption', ''), os.path.basename(path), "Standard Engine"
+                )
+            
             return path
         except Exception as e:
             print(f"ENGINE ERROR: generate_standard_post failed: {e}")
@@ -695,22 +729,48 @@ class InstagramEngine:
         satire_data = await self.summarizer.generate_satire(topic, news_context, language=language)
         if not satire_data: return None
         
-        # 2. Image Sourcing (AI-first for satire)
-        if not image_url or "google" in image_url.lower():
-            query, _, _, imagen_prompt = await self.summarizer.generate_search_query(satire_data.get('headline', topic), news_context)
-            search_results = await NewsFetcher.search_image(query)
-            
-            if search_results:
-                image_url = search_results[0]
-            else:
-                # GCP: Imagen 3
-                print(f"DEBUG: No web image found for satire. Generating with Imagen 3.")
-                img_bytes = await self.summarizer.client.generate_image(imagen_prompt, aspect_ratio=aspect_ratio)
-                if img_bytes:
-                    imagen_filename = f"imagen_satire_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
-                    with open(os.path.join(OUTPUT_DIR, imagen_filename), "wb") as f:
-                        f.write(img_bytes)
-                    image_url = f"/static/output/{imagen_filename}"
+        # 2. Image Sourcing (ALWAYS AI-GENERATED for Satire)
+        print(f"DEBUG: Sourcing satire context for AI image reconstruction...")
+        query, visual_ideal, protagonist, imagen_prompt = await self.summarizer.generate_search_query(satire_data.get('headline', topic), news_context)
+        
+        # --- IMPROVED CONTEXT: Analysis of source image if available ---
+        image_analysis = ""
+        if image_url and not image_url.startswith("/"):
+            try:
+                import httpx
+                async with httpx.AsyncClient() as client:
+                    resp = await client.get(image_url, timeout=10)
+                    if resp.status_code == 200:
+                        tmp_path = os.path.join(OUTPUT_DIR, f"tmp_satire_{datetime.now().strftime('%H%M%S')}.jpg")
+                        with open(tmp_path, "wb") as f: f.write(resp.content)
+                        
+                        print(f"DEBUG: Analyzing source image for satirical reconstruction...")
+                        analysis_prompt = f"Describe the scene, lighting, and characters for a satirical artist. Focus on accuracy: {protagonist}"
+                        image_analysis = await self.summarizer.client.analyze_image(tmp_path, analysis_prompt)
+                        os.remove(tmp_path)
+            except Exception as ae:
+                print(f"DEBUG: Satire source analysis skipped: {ae}")
+
+        # Refine prompt with analysis
+        final_prompt = f"{imagen_prompt}. Satirical Style Details: {image_analysis}. Ensure dramatic lighting and hyper-realistic, slightly exaggerated textures."
+
+        # 3. Generate the Final AI Image (Imagen 3.0)
+        print(f"DEBUG: Generating dramatic AI image for satire with Imagen 3.0...")
+        img_bytes = await self.summarizer.client.generate_image(final_prompt, aspect_ratio=aspect_ratio)
+        
+        image_url = None
+        is_ai_image = True
+        
+        if img_bytes:
+            imagen_filename = f"satire_post_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+            save_path = os.path.join(OUTPUT_DIR, imagen_filename)
+            with open(save_path, "wb") as f:
+                f.write(img_bytes)
+            image_url = f"/static/output/{imagen_filename}"
+            print(f"DEBUG: Satire AI Image Generated OK ({len(img_bytes)//1024}KB) -> {imagen_filename}")
+        else:
+            print(f"❌ FAILURE: Satire AI Image generation failed.")
+            return None
         
         if not image_url:
             image_url = f"https://loremflickr.com/1080/1080/{urllib.parse.quote(topic)},politics,india"

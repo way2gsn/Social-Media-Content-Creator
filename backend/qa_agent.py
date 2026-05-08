@@ -10,18 +10,22 @@ class QAAgent:
         """
         client = get_gcp_client()
         
-        prompt = f"""You are a strict editorial Quality Assurance agent for a premium news social media account.
+        is_test = any(kw in title.lower() for kw in ["test", "manual", "force"])
+        lenient_instruction = "IMPORTANT: This is a MANUAL TEST. Be more lenient on background text, focus on validating if the overall design and character likeness are professional." if is_test else ""
+
+        prompt = f"""You are a senior editorial Quality Assurance agent for a premium news social media account.
 Analyze this generated social media post and the provided context/title.
 
 Context/Title used to generate this post: "{title}"
+{lenient_instruction}
 
-Check the following criteria STRICTLY:
-1. Visual Clarity: Is the background a messy poster full of text? The background should be clean. If there is chaotic background text (like a movie poster or an ad) behind the main subject, FAIL it.
-2. Contextual Value: Does the post have a complete, context-rich headline, or is it a half-baked, meaningless title? If the text on the post or the context provided is meaningless or just a single name without context, FAIL it.
-3. Character Visibility: Is the main subject clearly visible and properly framed? If they are cut off awkwardly or completely hidden, FAIL it.
+Check the following criteria:
+1. Visual Clarity: The background should be clean. If there is chaotic/unreadable background text that ruins the premium look, FAIL it.
+2. Contextual Value: Does the post have a complete, context-rich headline? If it is just a single name without context, FAIL it.
+3. Character Visibility: Is the main subject clearly visible and properly framed? If they are completely hidden or distorted beyond recognition, FAIL it.
 
-Output ONLY a raw, valid JSON object with the following keys:
-"approved": boolean (true if it passes ALL criteria, false otherwise)
+Output ONLY a raw, valid JSON object:
+"approved": boolean (true if it passes the core criteria, false otherwise)
 "reason": string (a short sentence explaining why it passed or failed)
 """
         

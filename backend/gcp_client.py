@@ -7,6 +7,8 @@ os.environ["GRPC_ENABLE_FORK_SUPPORT"] = "false"
 import base64
 from google.oauth2 import service_account
 import vertexai
+from google import genai
+from google.genai import types
 
 # Smart Import for Vertex AI models (handles different library versions)
 try:
@@ -35,7 +37,7 @@ class GCPClient:
             cls._instance = super(GCPClient, cls).__new__(cls)
         return cls._instance
 
-    def __init__(self, key_path=None):
+    def __init__(self, key_path=None, location="us-central1"):
         if hasattr(self, 'initialized'):
             return
         
@@ -48,7 +50,7 @@ class GCPClient:
             self.key_data = json.load(f)
         
         self.project_id = self.key_data['project_id']
-        self.location = "us-central1" # Original working region
+        self.location = location
         self.credentials = service_account.Credentials.from_service_account_info(self.key_data).with_scopes(['https://www.googleapis.com/auth/cloud-platform'])
         
         print(f"GCP: Initializing in {self.location} with gemini-2.5-flash...")
@@ -63,14 +65,32 @@ class GCPClient:
                 SafetySetting(category=HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold=HarmBlockThreshold.BLOCK_NONE),
             ]
 
-            self.text_model = GenerativeModel("gemini-2.5-flash")
-            self.pro_model = GenerativeModel("gemini-2.5-flash") 
-            # Load image model — imagen-3.0-fast-generate-001
+            self.text_model_name = "gemini-2.5-flash"
+            self.image_gen_model_name = "imagen-3.0-generate-002"
+            self.text_model = GenerativeModel(self.text_model_name)
+            self.pro_model = GenerativeModel("gemini-2.5-pro") 
+            
+            # 1. New GenAI Client for stable Multimodal (Gemini 3.1) - Primary for this user
+            self.genai_client = genai.Client(
+                vertexai=True, 
+                project=self.project_id, 
+                location=self.location,
+                credentials=self.credentials
+            )
+            print("GCP: GenAI Client (Stable Multimodal) Ready.")
+
+            # 2. Stable Imagen 3.0 Model (Fallback/Secondary)
+            self.image_model = None
             try:
-                self.image_model = ImageGenerationModel.from_pretrained("imagen-3.0-fast-generate-001")
-            except Exception as img_err:
-                print(f"GCP: imagen-3.0-generate-002 failed, trying fallback: {img_err}")
-                self.image_model = ImageGenerationModel.from_pretrained("imagen-3.0-fast-generate-001")
+                self.image_model = ImageGenerationModel.from_pretrained("imagen-3.0-generate-002")
+                print("GCP: Imagen 3.0 STABLE Initialized.")
+            except Exception as e:
+                print(f"GCP: Imagen STABLE unavailable ({e}). Trying v6...")
+                try:
+                    self.image_model = ImageGenerationModel.from_pretrained("imagegeneration@006")
+                    print("GCP: Imagen Fallback (v6) Initialized.")
+                except:
+                    print("GCP: ALL Imagen legacy models unavailable in this region.")
             
             print("GCP: Vertex AI fully UNLOCKED.")
         except Exception as e:
@@ -78,75 +98,71 @@ class GCPClient:
 
         self.initialized = True
     async def generate_text(self, prompt, system_instruction=None, json_mode=True, use_pro=False):
-        """Generates text using Gemini 1.5 Flash or Pro."""
-        model = self.pro_model if use_pro else self.text_model
+        """Generates text using Gemini 1.5 Flash or Pro via the modern GenAI SDK."""
+        import asyncio
+        loop = asyncio.get_event_loop()
         
-        # Configuration - Lower temperature for better stability/JSON compliance
-        config = {
-            "temperature": 0.2,
-            "top_p": 0.95,
-            "max_output_tokens": 4096
-        }
-
-        # Note: In vertexai, system_instruction is passed during model initialization 
-        # but for simplicity here we prepend it if provided
+        # Region Priority & Backoff (Synchronized with imageGen.py: global primary)
+        # Region Priority & Backoff: Prioritize high-capacity regions over global to avoid initial 429s
+        locations = ["us-central1", "europe-west4", "asia-northeast1", "global"]
+        backoffs = [5, 15, 45, 120] # Slightly more aggressive backoff for 2.5 tier
+        max_retries = len(locations)
+        
+        # Determine model
+        model_id = "gemini-1.5-pro" if use_pro else self.text_model_name
+        
         full_prompt = prompt
         if system_instruction:
             full_prompt = f"{system_instruction}\n\n{prompt}"
-
-        # Quota Resilience Strategy: Flash-to-Flash Fallback (Best for this project)
-        model_name = "gemini-2.5-flash" # Primary
-        max_retries = 5
-        retry_delay = 3
-        current_model_id = model_name
-        
+            
         for attempt in range(max_retries):
+            loc = locations[attempt % len(locations)]
             try:
-                # Emergency Fallback: If 2.5 is exhausted, switch to 1.5-flash (different quota)
-                if attempt >= 3:
-                    current_model_id = "gemini-1.5-flash"
+                # Create a regional client for this attempt
+                temp_client = genai.Client(
+                    vertexai=True,
+                    project=self.project_id,
+                    location=loc,
+                    credentials=self.credentials
+                )
                 
-                model = GenerativeModel(current_model_id)
-                
-                # Running in thread since vertexai is blocking
-                import asyncio
-                import re
-                loop = asyncio.get_event_loop()
                 response = await loop.run_in_executor(
-                    None, 
-                    lambda: model.generate_content(
-                        full_prompt, 
-                        generation_config=config,
-                        safety_settings=self.safety_settings
+                    None,
+                    lambda: temp_client.models.generate_content(
+                        model=model_id,
+                        contents=full_prompt,
+                        config=types.GenerateContentConfig(
+                            temperature=0.2,
+                            top_p=0.95,
+                            max_output_tokens=4096
+                        )
                     )
                 )
-                text = response.text if response and hasattr(response, 'text') else ""
-                if not text:
-                    raise Exception("Empty response from AI")
-                break # Success
+                
+                if response and response.text:
+                    text = response.text.strip()
+                    if json_mode:
+                        import re
+                        # Remove ```json ... ``` or ``` ... ``` wrappers
+                        cleaned = re.sub(r'^```(?:json)?\s*\n?', '', text)
+                        cleaned = re.sub(r'\n?```\s*$', '', cleaned)
+                        return cleaned.strip()
+                    return text
+                    
+                raise Exception("Empty response from model")
+                
             except Exception as e:
                 error_str = str(e)
                 if "429" in error_str or "Resource exhausted" in error_str:
-                    if attempt < max_retries - 1:
-                        wait_time = retry_delay * (2 ** attempt)
-                        print(f"⚠️ Quota hit (429) for {current_model_id}. Emergency retry in {wait_time}s... ({attempt+1}/{max_retries})")
-                        await asyncio.sleep(wait_time)
-                        continue
-                print(f"GCP Text Error on {current_model_id}: {e}")
-                text = ""
-                # If we've already tried the fallback model and still fail, break
-                if current_model_id == "gemini-1.5-flash":
-                    break
+                    wait_time = backoffs[attempt]
+                    print(f"⚠️ Text Quota hit (429) in {loc} for {model_id}. Failover in {wait_time}s... ({attempt+1}/{max_retries})")
+                    await asyncio.sleep(wait_time)
+                else:
+                    print(f"⚠️ Text Gen Error on {model_id} ({loc}): {e}")
+                    if attempt == max_retries - 1:
+                        return f"Error: {str(e)}"
         
-        # Process result outside the loop
-        if text and json_mode:
-            text_content = text.strip()
-            # Remove ```json ... ``` or ``` ... ``` wrappers
-            cleaned = re.sub(r'^```(?:json)?\s*\n?', '', text_content)
-            cleaned = re.sub(r'\n?```\s*$', '', cleaned)
-            return cleaned.strip()
-        
-        return text if text else ""
+        return "Summary generation unavailable."
 
     async def analyze_image(self, image_path: str, prompt: str) -> str:
         """Analyzes an image using Gemini Flash Vision capabilities."""
@@ -170,7 +186,14 @@ class GCPClient:
                 lambda: model.generate_content([image_part, prompt])
             )
             
-            text = response.text if response and hasattr(response, 'text') else ""
+            # Handle multiple parts (e.g. text + thought signature)
+            text_parts = []
+            if response and response.candidates:
+                for part in response.candidates[0].content.parts:
+                    if hasattr(part, 'text'):
+                        text_parts.append(part.text)
+            
+            text = "".join(text_parts)
             if text:
                 text_content = text.strip()
                 cleaned = re.sub(r'^```(?:json)?\s*\n?', '', text_content)
@@ -183,48 +206,148 @@ class GCPClient:
 
 
     async def generate_image(self, prompt, aspect_ratio="9:16"):
-        """Generates an image using Imagen 3."""
+        """Generates an image using Stable Imagen 3.0 (Primary) or Gemini Multimodal (Fallback)."""
         try:
             import asyncio
             loop = asyncio.get_event_loop()
             
-            # Aspect ratio mapping for Imagen
-            ar_map = {"9:16": "9:16", "4:5": "3:4", "1:1": "1:1"}
-            target_ar = ar_map.get(aspect_ratio, "9:16")
+            # 1. Primary Choice: Stable Imagen 3.0
+            if self.image_model is not None:
+                try:
+                    # Aspect ratio mapping for Imagen
+                    ar_map = {"9:16": "9:16", "4:5": "3:4", "1:1": "1:1"}
+                    target_ar = ar_map.get(aspect_ratio, "9:16")
 
-            async def _do_gen(ar_val):
-                return await loop.run_in_executor(
-                    None,
-                    lambda: self.image_model.generate_images(
-                        prompt=prompt,
-                        number_of_images=1,
-                        language="en",
-                        aspect_ratio=ar_val,
-                        safety_filter_level="block_only_high",
-                        person_generation="allow_all"
-                    )
-                )
-
-            try:
-                response = await _do_gen(target_ar)
-            except TypeError as te:
-                if "aspect_ratio" in str(te):
-                    print(f"DEBUG: SDK doesn't support aspect_ratio. Retrying without it...")
-                    # Fallback for older SDKs
+                    print(f"DEBUG: Using Stable Imagen 3.0 (Aspect: {target_ar})")
                     response = await loop.run_in_executor(
                         None,
                         lambda: self.image_model.generate_images(
                             prompt=prompt,
                             number_of_images=1,
-                            language="en"
+                            language="en",
+                            aspect_ratio=target_ar,
+                            safety_filter_level="block_only_high",
+                            person_generation="allow_all"
                         )
                     )
-                else: raise te
+                    if response and response.images:
+                        print(f"✅ Image Generated via STABLE Imagen 3.0")
+                        return response.images[0]._image_bytes
+                except Exception as e:
+                    print(f"⚠️ Stable Imagen Failed: {e}. Trying Gemini Failover...")
 
-            if response and response.images:
-                # Get image bytes
-                img_bytes = response.images[0]._image_bytes
-                return img_bytes
+            # 2. Secondary Choice: Gemini Multimodal Failover with Multi-Region Resilience
+            # USER PREFERENCE: Prioritize global for 3.1 stability
+            locations = ["global", "us-central1", "us-east4", "europe-west4"]
+            # Synchronized with imageGen.py: 60s -> 120s -> 180s backoff
+            backoffs = [60, 120, 180, 240] 
+            max_retries = len(backoffs)
+            current_model_id = self.image_gen_model_name
+            
+            if hasattr(self, 'image_gen_model_name') and ("gemini-3" in self.image_gen_model_name or "gemini-2.5" in self.image_gen_model_name or "image-preview" in self.image_gen_model_name):
+                for attempt in range(max_retries):
+                    loc = locations[attempt % len(locations)]
+                    # The new GenAI SDK handles location at client level
+                    # So we create a localized client for this attempt
+                    temp_client = genai.Client(
+                        vertexai=True, 
+                        project=self.project_id, 
+                        location=loc, 
+                        credentials=self.credentials
+                    )
+                    
+                    # Logic: Only try Gemini Multimodal in 'global'. 
+                    # If failing over to other regions, use stable Imagen or 1.5-flash for vision only
+                    use_multimodal = (loc == "global")
+                    # Safety gap before generation (Matched to imageGen.py success: 15s)
+                    await asyncio.sleep(15)
+                    
+                    try:
+                        if use_multimodal:
+                            print(f"DEBUG: Attempting Multimodal Gen in {loc} via {self.image_gen_model_name}")
+                            response = await loop.run_in_executor(
+                                None,
+                                lambda: temp_client.models.generate_content(
+                                    model=self.image_gen_model_name,
+                                    contents=[prompt],
+                                    config=types.GenerateContentConfig(
+                                        response_modalities=["IMAGE"],
+                                        image_config=types.ImageConfig(
+                                            aspect_ratio=aspect_ratio,
+                                            image_size="1K"
+                                        )
+                                    )
+                                )
+                            )
+                            if response and response.candidates:
+                                for part in response.candidates[0].content.parts:
+                                    if part.inline_data:
+                                        print(f"✅ AI Image Generated natively in {loc} via {self.text_model_name}")
+                                        return part.inline_data.data
+                        else:
+                            # REGIONAL FALLBACK: Use Stable Imagen in this region
+                            print(f"DEBUG: Using Regional Stable Imagen in {loc} (Failover Path)")
+                            ar_map = {"9:16": "9:16", "4:5": "3:4", "1:1": "1:1"}
+                            target_ar = ar_map.get(aspect_ratio, "9:16")
+                            
+                            # Use the newer SDK for Imagen in regions too
+                            response = await loop.run_in_executor(
+                                None,
+                                lambda: temp_client.models.generate_images(
+                                    model="imagen-3.0-generate-001",
+                                    prompt=prompt,
+                                    config=types.GenerateImagesConfig(
+                                        number_of_images=1,
+                                        aspect_ratio=target_ar,
+                                        safety_filter_level="BLOCK_ONLY_HIGH",
+                                        person_generation="ALLOW_ALL"
+                                    )
+                                )
+                            )
+                            if response:
+                                try:
+                                    print(f"DEBUG: Regional Response Object Found")
+                                    data_dict = {}
+                                    if hasattr(response, 'model_dump'):
+                                        data_dict = response.model_dump()
+                                    elif hasattr(response, 'dict'):
+                                        data_dict = response.dict()
+                                    
+                                    img_bytes = None
+                                    
+                                    # Recursive search for bytes
+                                    def find_bytes(obj):
+                                        if isinstance(obj, bytes) and len(obj) > 5000: # Typical image size
+                                            return obj
+                                        if isinstance(obj, dict):
+                                            for v in obj.values():
+                                                res = find_bytes(v)
+                                                if res: return res
+                                        if isinstance(obj, list):
+                                            for v in obj:
+                                                res = find_bytes(v)
+                                                if res: return res
+                                        return None
+
+                                    img_bytes = find_bytes(data_dict)
+                                    
+                                    if img_bytes:
+                                        print(f"✅ Image Generated via Regional Stable Imagen ({loc}) - {len(img_bytes)} bytes")
+                                        return img_bytes
+                                except Exception as de:
+                                    print(f"DEBUG: Error during recursive extraction: {de}")
+                            
+                            print(f"⚠️ Regional Imagen ({loc}) returned no valid image data. Continuing failover...")
+                    except Exception as e:
+                        error_str = str(e)
+                        if "429" in error_str or "Resource exhausted" in error_str:
+                            wait_time = backoffs[attempt]
+                            print(f"⚠️ Image Quota hit (429) in {loc}. Failover in {wait_time}s...")
+                            await asyncio.sleep(wait_time)
+                            continue
+                        break
+            
+            return None
         except Exception as e:
             print(f"GCP Image Error: {e}")
             return None
