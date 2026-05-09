@@ -93,14 +93,14 @@
         }
 
         .headline {
-            font-family: 'Outfit', sans-serif;
-            font-size: 82px;
+            font-family: 'Martel', serif;
+            font-size: 76px; /* Reduced slightly to fit up to 10 words comfortably */
             font-weight: 900;
-            line-height: 1.0;
+            line-height: 0.95;
             letter-spacing: -3px;
             text-transform: uppercase;
             color: var(--text-main);
-            max-width: 900px;
+            max-width: 950px;
             text-shadow: var(--text-shadow);
         }
 
@@ -179,7 +179,12 @@
 
     <div class="content-master">
         <div class="editorial-header">
-            <div class="category-tag">Insight Report</div>
+            <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                <div class="category-tag" style="margin-bottom: 0;">Insight Report</div>
+                {% if source_domain %}
+                <div class="category-tag" style="margin-bottom: 0; background: #22c55e; border: 1px solid rgba(255,255,255,0.3);">VERIFIED: {{ source_domain }}</div>
+                {% endif %}
+            </div>
             <h1 class="headline">{{ headline }}</h1>
         </div>
         

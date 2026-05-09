@@ -209,46 +209,48 @@ class AISummarizer:
             print(f"DEBUG: Image Analysis Error: {e}")
             return ""
 
-    async def summarize_news(self, title, text, language="english"):
-        lang_instruction = f"OUTPUT LANGUAGE: {language}"
-        if language == "hinglish":
-            lang_instruction = "OUTPUT LANGUAGE: Hinglish (A mix of Romanized Hindi and English. e.g. 'Rupee down ho gaya')."
+    async def summarize_news(self, title, text, language="hinglish"):
+        # We now default to Hinglish for the 'Humorously Indians' vibe
+        lang_instruction = "OUTPUT LANGUAGE: Hinglish (A natural blend of Romanized Hindi and English. e.g. 'Ab development ka kya hoga?')."
         
-        system = (f"You are a Senior Editor at a top Indian news agency. {lang_instruction}\n"
-                  "Analyze the news and provide a JSON response.")
+        system = (
+            "You are the Sarcastic, Critical Lead Editor for 'Humorously Indians'.\n"
+            f"{lang_instruction}\n"
+            "TONE: Implicitly satirical. Never use words like 'Irony', 'Sarcasm', 'Satire', or 'Shocking'.\n"
+            "GOAL: Show the contradiction, don't label it. Be sharp, inquisitive, and deeply Indian."
+        )
         
         prompt = (f"Analyze this news: {title}. {text}.\n"
-                  "1. Create a single-line 6-word bold headline (UPPERCASE).\n"
-                  "2. Create a 1-line punchy subtitle.\n"
+                  "1. Create a single-line 8-10 word BOLD headline in HINGLISH (UPPERCASE). (e.g. 'NAYE BILL KA PURANA GAME: EVERYTHING IS FIXED').\n"
+                  "2. Create a 1-line subtitle in Hinglish that highlights a specific contradiction or asks a sharp question.\n"
                   "Output strictly as a JSON object with keys 'headline', 'subtitle'.")
         
         result = await self.client.generate_text(prompt, system_instruction=system)
         try:
             data = json.loads(result) if result else None
             if data:
-                # Strip markdown bold/italic stars
                 data['headline'] = data.get('headline', '').replace('**', '').replace('*', '').strip()
                 data['subtitle'] = data.get('subtitle', '').replace('**', '').replace('*', '').strip()
             return data
         except: return None
 
-    async def generate_deep_caption(self, headline, subtitle, context, language="english"):
-        lang_instruction = f"OUTPUT LANGUAGE: {language}"
-        if language == "hinglish":
-            lang_instruction = "OUTPUT LANGUAGE: Hinglish (A mix of Romanized Hindi and English)."
+    async def generate_deep_caption(self, headline, subtitle, context, language="hinglish"):
+        lang_instruction = "OUTPUT LANGUAGE: Hinglish (Romanized Hindi + English blend)."
         
-        system = f"You are a viral social media strategist. {lang_instruction}"
+        system = (
+            "You are the Voice of 'Humorously Indians'. Sarcastic, brief, and incredibly sharp.\n"
+            f"{lang_instruction}\n"
+            "RULE: Limit to 3-4 punchy sentences max. NEVER use labels like 'Sarcasm' or 'Irony'."
+        )
         
-        prompt = (f"Generate an ULTRA-DETAILED Instagram caption for this news.\n"
+        prompt = (f"Generate an Instagram caption for this news.\n"
                   f"Headline: {headline}\n"
-                  f"Summary: {subtitle}\n"
                   f"Context: {context}\n"
-                  "RULES:\n"
-                  "1. 100-120 words of deep analytical context.\n"
-                  "2. Mention specific names and stats from context.\n"
-                  "3. NO HTML tags.\n"
-                  "4. Add 5-8 hashtags.\n"
-                  "5. END with: 'Follow @Humorously_Indians for more posts.'\n"
+                  "STRUCTURE:\n"
+                  "1. One sharp, cynical observation about the news.\n"
+                  "2. One uncomfortable question for the government or authority.\n"
+                  "3. A call to action (e.g., 'Thoughts? Keep them civil, or don't.').\n"
+                  "4. Add 5-8 relevant hashtags.\n"
                   "Output strictly as a JSON object with key 'caption'.")
         
         result = await self.client.generate_text(prompt, system_instruction=system)
@@ -257,23 +259,26 @@ class AISummarizer:
         except: return {"caption": f"{headline}\n\n{subtitle}"}
 
     async def generate_search_query(self, title, text):
-        prompt = (f"Based on this news: {title} {text}, create an image strategy for a premium news agency.\n"
-                  "1. 'query': A 3-5 word search query for a REAL PHOTOGRAPH.\n"
-                  "2. 'visual_ideal': A short description of what the photograph SHOULD contain (e.g. 'Person at a podium', 'Currency notes').\n"
-                  "3. 'protagonist': The main person mentioned (e.g. 'Narendra Modi'). If no person, leave empty.\n"
-                  "4. 'imagen_prompt': A detailed, cinematic prompt for Imagen 3.0. "
-                  "Describe high-impact news photography, dramatic lighting, shallow depth of field, 8k, ultra-realistic, highly detailed, professional journalism aesthetic. "
-                  "Ensure the subject is CLEARLY IDENTIFIABLE and the scene is dramatic.")
+        prompt = (f"Based on this news: {title} {text}, create a RAW photojournalism strategy for 'Humorously Indians'.\n"
+                  "1. 'query': A 3-5 word search query for a REAL PRESS PHOTOGRAPH.\n"
+                  "2. 'visual_ideal': A short description of a CANDID, MUNDANE moment (e.g. 'Official reading file in a dusty office', 'Politician getting into a car').\n"
+                  "3. 'protagonist': The main person mentioned.\n"
+                  "4. 'imagen_prompt': A detailed prompt for Imagen 3.0 following these rules:\n"
+                  "   - STYLE: Unfiltered press photography, 35mm film grain, harsh direct flash, candid political moment.\n"
+                  "   - QUALITY: No AI smoothing, authentic skin textures, realistic lighting.\n"
+                  "   - SETTING: Mundane or bureaucratic Indian settings (dusty offices, crowded corridors, plain backgrounds).\n"
+                  "   - POSE: NO generic pointing or angry faces. Subject should be in a candid, neutral, or mid-action mundane pose.\n"
+                  "   - ANTI-HALLUCINATION: Symbolic metaphors for abstract topics. NEVER use superheroes.\n"
+                  "   - CENTERED: Subject in center of frame.")
         
         result = await self.client.generate_text(prompt)
         try:
             data = json.loads(result)
             img_prompt = data.get('imagen_prompt', title)
-            # Force centered composition for better framing
-            if "centered" not in img_prompt.lower():
-                img_prompt += ", centered composition, subject in center of frame"
+            if "35mm" not in img_prompt:
+                img_prompt += ", 35mm film grain, harsh direct flash, authentic textures"
             return data.get('query', title), data.get('visual_ideal', title), data.get('protagonist', ""), img_prompt
-        except: return title, title, "", f"Professional cinematic news photography of {title}, dramatic lighting, 8k, centered composition"
+        except: return title, title, "", f"Unfiltered press photography of {title}, 35mm film grain, harsh direct flash, candid moment"
 
     async def generate_satire(self, topic, news_context="", language="english"):
         lang_instruction = f"OUTPUT LANGUAGE: {language}"
@@ -561,8 +566,7 @@ class InstagramEngine:
                     datetime=datetime
                 )
                 
-                # Use 'load' to ensure images are fully painted
-                print(f"DEBUG: Rendering post with wait_until='load' (Aspect: {aspect_ratio})")
+                # Use 'load' to ensure images are fully painted. 
                 await page.set_content(html, wait_until='load', timeout=30000)
                 print("DEBUG: Content set successfully.")
                 
@@ -692,11 +696,15 @@ class InstagramEngine:
             with open(template_path, 'r') as f:
                 template_str = f.read()
 
+            from urllib.parse import urlparse
+            source_domain = urlparse(item['link']).netloc.replace("www.", "")
+            
             render_data = {
                 **summary,
                 "image_url": f"data:image/jpeg;base64,{image_base64}" if image_base64 else image_url,
                 "is_ai_image": is_ai_image,
-                "view_height": height
+                "view_height": height,
+                "source_domain": source_domain
             }
 
             filename = f"post_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"

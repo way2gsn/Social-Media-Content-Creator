@@ -90,8 +90,9 @@
             font-family: 'Playfair Display', serif;
             font-weight: 900;
             font-style: italic;
-            font-size: 60px; /* Scaled down for readability */
-            line-height: 1.25;
+            font-size: 64px; /* Scaled down for 10-word support */
+            line-height: 1.1;
+            letter-spacing: -2px;
             color: var(--text-main);
             position: relative;
             {% if heritage_mode == 'dark' %}
@@ -165,7 +166,12 @@
     </div>
 
     <div class="quote-panel">
-        <span class="character-name">{{ character_name }}</span>
+        <div style="display: flex; gap: 10px; margin-bottom: 20px; align-items: center;">
+             <span class="character-name" style="margin-bottom: 0;">{{ character_name }}</span>
+             {% if source_domain %}
+             <span style="font-family: 'Anton', sans-serif; font-size: 12px; background: #22c55e; color: white; padding: 4px 12px; border-radius: 4px; letter-spacing: 2px; text-transform: uppercase; border: 1px solid rgba(255,255,255,0.3);">VERIFIED: {{ source_domain }}</span>
+             {% endif %}
+        </div>
         <div class="quote-mark">“</div>
         <h1 class="headline">{{ headline }}</h1>
     </div>

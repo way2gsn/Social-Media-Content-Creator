@@ -446,10 +446,10 @@ class ExplainerEngine:
         # Refine prompt with analysis
         image_prompt = (
             f"CRITICAL IDENTITY: {plan.get('character_name', topic)}. "
-            f"A photorealistic professional CLOSE-UP news portrait of {plan.get('character_name', topic)}. "
+            f"STYLE: Unfiltered press photography, 35mm film grain, harsh direct flash, candid political moment. "
             f"Likeness Details: {image_analysis}. "
-            f"Style: {theme} theme, high impact, documentary photography. "
-            "8k, ultra-realistic, dramatic cinematic lighting, CENTERED CLOSE-UP, highly detailed face."
+            "QUALITY: No AI smoothing, authentic skin textures. Mundane bureaucratic Indian setting. "
+            "CENTERED, candid or neutral pose. NO GENERIC POINTING. NO BOKEH."
         )
         
         final_image_url = None
@@ -486,12 +486,16 @@ class ExplainerEngine:
         if aspect_ratio == "9:16":
             height = 1920
 
+        from urllib.parse import urlparse
+        source_domain = urlparse(source_url).netloc.replace("www.", "")
+        
         render_data = {
             **plan,
             "original_image": f"data:image/jpeg;base64,{image_base64}" if image_base64 else final_image_url,
             "cutout_image": cutout_base64,
             "view_height": height, 
-            "theme": theme
+            "theme": theme,
+            "source_domain": source_domain
         }
         
         from glue import InstagramEngine

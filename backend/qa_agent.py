@@ -22,7 +22,12 @@ Context/Title used to generate this post: "{title}"
 Check the following criteria:
 1. Visual Clarity: The background should be clean. If there is chaotic/unreadable background text that ruins the premium look, FAIL it.
 2. Contextual Value: Does the post have a complete, context-rich headline? If it is just a single name without context, FAIL it.
-3. Character Visibility: Is the main subject clearly visible and properly framed? If they are completely hidden or distorted beyond recognition, FAIL it.
+3. Character Visibility: Is the main subject clearly visible and properly framed?
+4. Topic Alignment (Context Lock): Does the image match the news topic? 
+   - If the news is about "Financials/Economy", the image must be symbolic (money, scales, graphs). 
+   - If the news is about "Protests", the atmosphere must be tense/realistic. 
+   - NO fictional characters (e.g. Wonder Woman, Superheroes) allowed for real-world news events. FAIL if you see any "Superheroes" or "Fictional characters" in a news post.
+5. Visual Style: Does it look like RAW PHOTOJOURNALISM? If it looks like a "3D Render", "Cartoon", or "Cinematic AI Art", FAIL it. It must look like a press photo.
 
 Output ONLY a raw, valid JSON object:
 "approved": boolean (true if it passes the core criteria, false otherwise)

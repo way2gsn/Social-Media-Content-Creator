@@ -87,13 +87,15 @@
         }
 
         .headline {
-            font-family: 'Anton', sans-serif;
-            font-size: 82px;
-            line-height: 1.0;
+            font-family: 'Martel', serif;
+            font-size: 76px;
+            font-weight: 900;
+            line-height: 0.95;
+            letter-spacing: -3px;
             text-transform: uppercase;
             color: var(--text-main);
-            text-shadow: var(--shadow-soft);
             max-width: 1000px;
+            text-shadow: var(--text-shadow);
         }
 
         /* Insight Feature Panel */
@@ -155,7 +157,12 @@
 
     <div class="poster-box">
         <div class="top-meta">
-            <span class="exclusive-pill">EXCLUSIVE FEATURE</span>
+            <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                <span class="exclusive-pill" style="margin-bottom: 0;">EXCLUSIVE FEATURE</span>
+                {% if source_domain %}
+                <span class="exclusive-pill" style="margin-bottom: 0; background: #22c55e; border: 2px solid rgba(255,255,255,0.5);">VERIFIED: {{ source_domain }}</span>
+                {% endif %}
+            </div>
             <h1 class="headline">{{ headline }}</h1>
         </div>
         
