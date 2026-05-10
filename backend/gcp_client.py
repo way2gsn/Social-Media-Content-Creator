@@ -109,7 +109,7 @@ class GCPClient:
         max_retries = len(locations)
         
         # Determine model
-        model_id = "gemini-1.5-pro" if use_pro else self.text_model_name
+        model_id = "gemini-2.5-pro" if use_pro else self.text_model_name
         
         full_prompt = prompt
         if system_instruction:

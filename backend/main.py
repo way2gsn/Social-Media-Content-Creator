@@ -251,6 +251,21 @@ async def generate_quote_endpoint(topics: str = Form(...), language: str = Form(
     background_tasks.add_task(run_quote_generation, task_id, topic_list, language, aspect_ratio)
     return {"task_id": task_id}
 
+# ─── 4. MAGAZINE POST (High-End Art Director Test) ───────────
+@app.post("/generate-magazine")
+async def generate_magazine_endpoint(topics: str = Form(...), background_tasks: BackgroundTasks = None):
+    task_id = str(uuid.uuid4())[:8]
+    topic_list = [t.strip() for t in topics.split(",")]
+    tasks[task_id] = {
+        "status": "Starting Magazine Art Director...",
+        "progress": 0,
+        "logs": [f"Initialized Senior Art Director 'MAGAZINE' Post for {topics}"],
+        "results": []
+    }
+    # We use the quote generation runner as it's been upgraded to the Magazine logic
+    background_tasks.add_task(run_quote_generation, task_id, topic_list, "english", "9:16")
+    return {"task_id": task_id}
+
 # ─── 4. CINEMATIC VIDEO (9:16, AI script, Veo, TTS) ────────────
 @app.post("/generate-cinematic")
 async def generate_cinematic_endpoint(topics: str = Form(...), background_tasks: BackgroundTasks = None):
@@ -541,13 +556,13 @@ class AutonomousAutomation:
         from glue import AISummarizer
         explainer_engine = ExplainerEngine()
         
-        # 1. Determine topics (Grounded Satire & Investigative Context)
+        # 1. Determine topics (Authentic Investigative Reporting)
         topics = [
-            "Indian Political Irony", "Government Policy Contradictions", "Indian Economic Crisis", 
-            "Middle Class Struggles India", "Urban Infrastructure Fails India", "Political Promises vs Reality",
-            "Indian Judicial Delays", "Public Transport Irony India", "Tech Inequality India",
-            "Environment Policy vs Ground Reality India", "Education System Paradox India",
-            "Taxation Irony India", "Indian Diplomacy Sarcasm", "Bureaucracy Red Tape India"
+            "Indian Political Analysis", "Government Policy Impact", "Indian Economic Growth Data", 
+            "Middle Class Reality India", "Urban Infrastructure Audit India", "Political Promises Progress Report",
+            "Indian Judicial System Background", "Public Transport Infrastructure India", "Digital Divide India",
+            "Environmental Policy Ground Reality India", "Education System Reforms India",
+            "Taxation Structure Analysis India", "Indian Diplomacy Deep-Dive", "Bureaucracy Efficiency Report India"
         ]
         random.shuffle(topics)
         
@@ -589,14 +604,13 @@ class AutonomousAutomation:
                 print(f"🤖 [AUTONOMOUS] Cycle Task: Generating {task_type} ({aspect_ratio}) for: {item['title']}")
                 path = None
                 
+                lang_instruction = "OUTPUT LANGUAGE: Simple English."
                 if task_type == "REEL":
                     cine_engine = CinematicVideoEngine()
-                    path, _ = await cine_engine.generate_video(item['title'])
+                    path, _, _ = await cine_engine.generate_video(item['title'])
                 elif task_type == "QUOTE":
-                    # Aspect ratio is handled inside generate_quote_post now (set to 9:16)
                     path, _ = await explainer_engine.generate_quote_post(item['title'], language="english")
-                else:
-                    # Standard Post - We pass aspect ratio
+                else: # STANDARD
                     path = await engine.generate_standard_post(item, item['title'], language="english", aspect_ratio=aspect_ratio)
                 
                 if path:

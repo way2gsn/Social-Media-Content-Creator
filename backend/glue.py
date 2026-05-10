@@ -208,21 +208,20 @@ class AISummarizer:
         except Exception as e:
             print(f"DEBUG: Image Analysis Error: {e}")
             return ""
-
-    async def summarize_news(self, title, text, language="hinglish"):
-        # We now default to Hinglish for the 'Humorously Indians' vibe
-        lang_instruction = "OUTPUT LANGUAGE: Hinglish (A natural blend of Romanized Hindi and English. e.g. 'Ab development ka kya hoga?')."
+    async def summarize_news(self, title, text, language="english"):
+        # Senior Investigative Journalist Persona
+        lang_instruction = "OUTPUT LANGUAGE: Simple, Professional English."
         
         system = (
-            "You are the Sarcastic, Critical Lead Editor for 'Humorously Indians'.\n"
+            "You are the Senior Investigative Journalist for 'Humorously Indians'.\n"
             f"{lang_instruction}\n"
-            "TONE: Implicitly satirical. Never use words like 'Irony', 'Sarcasm', 'Satire', or 'Shocking'.\n"
-            "GOAL: Show the contradiction, don't label it. Be sharp, inquisitive, and deeply Indian."
+            "TONE: Professional, Authoritative, Fact-Focused.\n"
+            "GOAL: Provide deep context and investigative clarity. Move away from sarcasm to authentic reporting."
         )
         
-        prompt = (f"Analyze this news: {title}. {text}.\n"
-                  "1. Create a single-line 8-10 word BOLD headline in HINGLISH (UPPERCASE). (e.g. 'NAYE BILL KA PURANA GAME: EVERYTHING IS FIXED').\n"
-                  "2. Create a 1-line subtitle in Hinglish that highlights a specific contradiction or asks a sharp question.\n"
+        prompt = (f"Analyze this news in depth: {title}. {text}.\n"
+                  "1. Create a detailed, context-rich ENGLISH headline (UPPERCASE). MAX 8 WORDS.\n"
+                  "2. Create a 1-line investigative summary in English that provides critical background context. MAX 15 WORDS.\n"
                   "Output strictly as a JSON object with keys 'headline', 'subtitle'.")
         
         result = await self.client.generate_text(prompt, system_instruction=system)
@@ -234,24 +233,16 @@ class AISummarizer:
             return data
         except: return None
 
-    async def generate_deep_caption(self, headline, subtitle, context, language="hinglish"):
-        lang_instruction = "OUTPUT LANGUAGE: Hinglish (Romanized Hindi + English blend)."
-        
-        system = (
-            "You are the Voice of 'Humorously Indians'. Sarcastic, brief, and incredibly sharp.\n"
-            f"{lang_instruction}\n"
-            "RULE: Limit to 3-4 punchy sentences max. NEVER use labels like 'Sarcasm' or 'Irony'."
-        )
-        
-        prompt = (f"Generate an Instagram caption for this news.\n"
-                  f"Headline: {headline}\n"
-                  f"Context: {context}\n"
-                  "STRUCTURE:\n"
-                  "1. One sharp, cynical observation about the news.\n"
-                  "2. One uncomfortable question for the government or authority.\n"
-                  "3. A call to action (e.g., 'Thoughts? Keep them civil, or don't.').\n"
-                  "4. Add 5-8 relevant hashtags.\n"
-                  "Output strictly as a JSON object with key 'caption'.")
+    async def generate_deep_caption(self, headline, subtitle, news_text, language="english"):
+        system = "You are a Senior Investigative Correspondent. Your captions provide deep, nuanced context and investigative detail in English."
+        prompt = (f"Headline: {headline}\nSubtitle: {subtitle}\nContext: {news_text}\n"
+                  "Create a detailed, context-rich 5-6 sentence Instagram caption in Simple English.\n"
+                  "Structure: \n"
+                  "1. Detailed context of the situation.\n"
+                  "2. Key investigative insights and background data.\n"
+                  "3. Impact on the common citizen.\n"
+                  "4. Future implications or expert perspective.\n"
+                  "Output as JSON: {'caption': '...'}")
         
         result = await self.client.generate_text(prompt, system_instruction=system)
         try:
@@ -259,31 +250,29 @@ class AISummarizer:
         except: return {"caption": f"{headline}\n\n{subtitle}"}
 
     async def generate_search_query(self, title, text):
-        prompt = (f"Based on this news: {title} {text}, create a RAW photojournalism strategy for 'Humorously Indians'.\n"
-                  "1. 'query': A 3-5 word search query for a REAL PRESS PHOTOGRAPH.\n"
-                  "2. 'visual_ideal': A short description of a CANDID, MUNDANE moment (e.g. 'Official reading file in a dusty office', 'Politician getting into a car').\n"
+        prompt = (f"Based on this news: {title} {text}, create a DYNAMIC EDITORIAL COMPOSITION.\n"
+                  "1. 'query': A 3-5 word search query for a PRESS PHOTOGRAPH.\n"
+                  "2. 'visual_ideal': A CANDID, MUNDANE moment.\n"
                   "3. 'protagonist': The main person mentioned.\n"
-                  "4. 'imagen_prompt': A detailed prompt for Imagen 3.0 following these rules:\n"
-                  "   - STYLE: Unfiltered press photography, 35mm film grain, harsh direct flash, candid political moment.\n"
-                  "   - QUALITY: No AI smoothing, authentic skin textures, realistic lighting.\n"
-                  "   - SETTING: Mundane or bureaucratic Indian settings (dusty offices, crowded corridors, plain backgrounds).\n"
-                  "   - POSE: NO generic pointing or angry faces. Subject should be in a candid, neutral, or mid-action mundane pose.\n"
-                  "   - ANTI-HALLUCINATION: Symbolic metaphors for abstract topics. NEVER use superheroes.\n"
-                  "   - CENTERED: Subject in center of frame.")
+                  "4. 'imagen_prompt': A detailed prompt for Imagen 3.0:\n"
+                  "   - CRITICAL: NO TEXT, NO WORDS, NO LETTERS, NO NUMBERS IN THE IMAGE. The image must be a clean photograph ONLY.\n"
+                  "   - COMPOSITION: Apply RULE OF THIRDS. Place the subject (person) on the far left or far right third of the frame.\n"
+                  "   - NEGATIVE SPACE: Ensure the opposite side of the subject is 'Negative Space' (dark, clean, or blurred background) to act as a canvas for typography.\n"
+                  "   - STYLE: Unfiltered press photography, 35mm film grain, harsh side-lighting, authentic skin textures.\n"
+                  "   - SETTING: Mundane Indian bureaucratic settings.")
         
         result = await self.client.generate_text(prompt)
         try:
             data = json.loads(result)
             img_prompt = data.get('imagen_prompt', title)
             if "35mm" not in img_prompt:
-                img_prompt += ", 35mm film grain, harsh direct flash, authentic textures"
+                img_prompt += ", 35mm film grain, harsh direct flash, asymmetrical composition"
             return data.get('query', title), data.get('visual_ideal', title), data.get('protagonist', ""), img_prompt
-        except: return title, title, "", f"Unfiltered press photography of {title}, 35mm film grain, harsh direct flash, candid moment"
+        except: return title, title, "", f"Vintage magazine photo of {title}, 35mm film grain, dramatic lighting, asymmetrical"
 
     async def generate_satire(self, topic, news_context="", language="english"):
         lang_instruction = f"OUTPUT LANGUAGE: {language}"
-        if language == "hinglish":
-            lang_instruction = "OUTPUT LANGUAGE: Hinglish (Romanized Hindi + English mix)."
+        lang_instruction = "OUTPUT LANGUAGE: Simple English."
 
         system = (
             "You are a high-level Government Spin Doctor. Think of yourself as a charismatic politician talking to a massive crowd.\n"
@@ -617,8 +606,11 @@ class InstagramEngine:
             if aspect_ratio == "9:16":
                 width, height = 1080, 1920
 
-            # 1. Summarize with language
+            # 1. Summarize
             summary = await self.summarizer.summarize_news(item['title'], item['summary'], language=language)
+            caption_data = await self.summarizer.generate_deep_caption(
+                summary.get('headline', item['title']), summary.get('subtitle', ''), item['summary'], language=language
+            )
             if not summary: 
                 print(f"ENGINE: Summary failed for {topic}")
                 return None
@@ -721,21 +713,21 @@ class InstagramEngine:
             print(f"ENGINE ERROR: generate_standard_post failed: {e}")
             return None
 
-    async def generate_satire_post(self, topic, aspect_ratio="9:16", language="english"):
+    async def generate_investigative_post(self, topic, aspect_ratio="9:16", language="english"):
         # Fetch news first to get context
         items = NewsFetcher.fetch_by_topic(topic, count=1)
         news_context = ""
         image_url = None
-        source_url = "Satire Studio"
+        source_url = "Investigative Studio"
         if items:
             item = items[0]
             news_context = f"{item['title']} - {item['summary']}"
             source_url = item['link']
             image_url = await NewsFetcher.extract_hero_image(item['link'])
         
-        # 1. Spin the Satire
-        satire_data = await self.summarizer.generate_satire(topic, news_context, language=language)
-        if not satire_data: return None
+        # 1. Deep Context Summary
+        investigative_data = await self.summarizer.summarize_news(topic, news_context, language=language)
+        if not investigative_data: return None
         
         # 2. Image Sourcing (ALWAYS AI-GENERATED for Satire)
         print(f"DEBUG: Sourcing satire context for AI image reconstruction...")
@@ -791,10 +783,10 @@ class InstagramEngine:
         # 4. Render
         dims = {"9:16": (1080, 1920), "4:5": (1080, 1350)}
         width, height = dims.get(aspect_ratio, (1080, 1920))
-        filename = f"satire_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{os.urandom(4).hex()}.png"
+        filename = f"investigative_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{os.urandom(4).hex()}.png"
         
         path = await self.render_post(
-            {**satire_data, "image_url": image_url},
+            {**investigative_data, "image_url": image_url},
             template_str,
             filename,
             width=width,
@@ -802,11 +794,12 @@ class InstagramEngine:
             aspect_ratio=aspect_ratio
         )
         
-        headline = satire_data.get('headline', 'STRIKE')
-        subtext = satire_data.get('subtext', satire_data.get('subtitle', 'Strategic Calibration'))
-        caption = satire_data.get('caption', 'Deep focus on systemic growth.')
-        hashtags = satire_data.get('hashtags', '')
-        full_caption = f"{caption}\n\n{hashtags}\n\nFollow @Humorously_Indians for more posts."
+        headline = investigative_data.get('headline', 'REPORT')
+        subtext = investigative_data.get('subtitle', 'Deep Context Analysis')
+        
+        # Generate deep caption
+        caption_data = await self.summarizer.generate_deep_caption(headline, subtext, news_context, language=language)
+        full_caption = caption_data.get('caption', f"{headline}\n\n{news_context}")
         
         DatabaseManager.save_post(topic, headline, subtext, full_caption, path, source_url)
         return path

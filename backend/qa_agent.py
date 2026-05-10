@@ -28,6 +28,9 @@ Check the following criteria:
    - If the news is about "Protests", the atmosphere must be tense/realistic. 
    - NO fictional characters (e.g. Wonder Woman, Superheroes) allowed for real-world news events. FAIL if you see any "Superheroes" or "Fictional characters" in a news post.
 5. Visual Style: Does it look like RAW PHOTOJOURNALISM? If it looks like a "3D Render", "Cartoon", or "Cinematic AI Art", FAIL it. It must look like a press photo.
+6. Compositional Integrity (THE KILL SWITCH): Analyze the placement of the text relative to the subject. 
+   - If the oversized text covers the subject's eyes, mouth, or central face, FAIL it immediately.
+   - If the subject is not positioned according to the Rule of Thirds (far left or far right), FAIL it.
 
 Output ONLY a raw, valid JSON object:
 "approved": boolean (true if it passes the core criteria, false otherwise)

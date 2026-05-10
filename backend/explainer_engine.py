@@ -16,6 +16,7 @@ except ImportError:
     REMBG_AVAILABLE = False
 
 from glue import LOGO_PATH, OUTPUT_DIR, AISummarizer, BACKEND_DIR, STATIC_DIR, NewsFetcher
+from composition_engine import DynamicCompositionEngine
 
 EXPL_TEMPLATES_DIR = os.path.join(BACKEND_DIR, "templates", "explainer")
 
@@ -35,25 +36,23 @@ class ExplainerEngine:
 
     async def plan_explainer(self, topic, news_context, language="english"):
         """Extract key points and identify the character."""
-        lang_instruction = f"OUTPUT LANGUAGE: {language}"
-        if language == "hinglish":
-            lang_instruction = "OUTPUT LANGUAGE: Hinglish (Romanized Hindi + English mix)."
+        lang_instruction = f"OUTPUT LANGUAGE: Simple English"
 
         prompt = (
-            "SYSTEM: You are a Lead Editorial Designer. You MUST identify specific people by name.\n"
+            "SYSTEM: You are a Senior Investigative Journalist for 'Humorously Indians'.\n"
             f"{lang_instruction}\n"
-            "TASK: Analyze the news and extract:\n"
-            "1. THE MAIN CHARACTER: Identify the SPECIFIC PERSON by name (e.g. 'Rahul Gandhi', 'Narendra Modi'). Do NOT use generic titles like 'Politician' if a name is present.\n"
-            "2. SECONDARY_CHARACTER: An opponent or subject mentioned by name. Leave empty if none.\n"
-            "3. THE CORE QUOTE or HEADLINE: A high-impact punchy statement.\n"
-            "4. 3-5 HIGH-VALUE POINTS: Accurate, short bullet points.\n"
-            "5. STYLE: 'EXPLAINER', 'MODERN_EDITORIAL', 'SATIRE', or 'QUOTE'.\n"
+            "TASK: Analyze the news in depth and extract:\n"
+            "1. THE MAIN CHARACTER: Identify the SPECIFIC PERSON by name.\n"
+            "2. SECONDARY_CHARACTER: Opponent or subject by name.\n"
+            "3. INVESTIGATIVE HEADLINE: A detailed, context-rich English headline. MAX 8 WORDS.\n"
+            "4. 3-5 CRITICAL DATA POINTS: Accurate, context-rich bullet points in English. Keep them brief.\n"
+            "5. STYLE: 'MAGAZINE' (Detailed Editorial), 'EXPLAINER', or 'QUOTE'.\n"
             "6. THEME: 'POLITICS', 'TECH', 'CULTURE', or 'CRIME'.\n"
             "7. SUBJECT_TYPE: 'PERSON' or 'OBJECT'.\n"
-            "8. LAYOUT: 'CENTERED', 'ASIDE', or 'DUAL_HERO'.\n"
-            "9. VISUAL_STRATEGY: 'AI_GENERATE' (ALWAYS for copyright safety).\n"
+            "8. LAYOUT: 'DYNAMIC' (Let the Composition Engine decide).\n"
+            "9. VISUAL_STRATEGY: 'AI_GENERATE'.\n"
             "10. IS_LISTICLE: boolean.\n"
-            "11. CONTENT_DEPTH: 'CAROUSEL_MANDATORY' or 'SINGLE_POST_OK'.\n"
+            "11. CONTENT_DEPTH: 'INVESTIGATIVE_DEPTH'.\n"
             f"NEWS CONTEXT: {news_context}\n"
             "Output strictly VALID JSON with keys: character_name, secondary_character, headline, points (list), style, theme, subject_type, layout, visual_strategy, is_listicle, content_depth."
         )
@@ -436,89 +435,101 @@ class ExplainerEngine:
 
         # --- NEW: Identity Fallback if no image analysis was possible ---
         if not image_analysis and plan.get('character_name'):
-            print(f"DEBUG: Scraper failed. Generating AI physical blueprint for Quote: {plan['character_name']}")
+            print(f"DEBUG: Scraper failed. Generating AI physical blueprint for Quote: {topic}")
             fallback_prompt = (
-                f"Describe the facial features and hair of {plan['character_name']} in extreme photographic detail. "
+                f"Describe the facial features and hair of {plan.get('character_name', topic)} in extreme photographic detail. "
                 "This description will be used to generate a photorealistic close-up AI headshot."
             )
             image_analysis = await self._gcp_request(fallback_prompt)
 
-        # Refine prompt with analysis
-        image_prompt = (
-            f"CRITICAL IDENTITY: {plan.get('character_name', topic)}. "
-            f"STYLE: Unfiltered press photography, 35mm film grain, harsh direct flash, candid political moment. "
-            f"Likeness Details: {image_analysis}. "
-            "QUALITY: No AI smoothing, authentic skin textures. Mundane bureaucratic Indian setting. "
-            "CENTERED, candid or neutral pose. NO GENERIC POINTING. NO BOKEH."
-        )
-        
-        final_image_url = None
-        image_base64 = None
-        is_ai_image = True
-        
-        try:
-            print(f"DEBUG: Generating cinematic background for quote with Imagen 3.0...")
-            img_data = await self.summarizer.client.generate_image(image_prompt, aspect_ratio=aspect_ratio)
-            if img_data:
-                imagen_filename = f"gen_quote_{timestamp}.jpg"
-                save_path = os.path.join(OUTPUT_DIR, imagen_filename)
-                with open(save_path, "wb") as f:
-                    f.write(img_data)
-                final_image_url = f"/static/output/{imagen_filename}"
-                image_base64 = base64.b64encode(img_data).decode()
-        except Exception as e:
-            print(f"❌ GCP Quote Image Error: {e}")
-            return None, f"Image Generation Failed: {e}"
-
-        # 4. Process for Rendering (NO CUTOUTS as requested)
-        cutout_base64 = None
-        
-        # 5. Render
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        quote_filename = f"quote_{timestamp}.jpg"
-        
-        template_path = os.path.join(EXPL_TEMPLATES_DIR, "EDITORIAL", "QUOTE.html")
-        with open(template_path, 'r') as f:
-            template_str = f.read()
+        # ─── AUTONOMOUS RETRY LOOP ───
+        max_retries = 3
+        for attempt in range(max_retries):
+            print(f"🤖 [AUTONOMOUS] Generation Attempt {attempt + 1}/{max_retries} for: {topic}")
             
-        # Determine dimensions
-        width, height = 1080, 1350
-        if aspect_ratio == "9:16":
-            height = 1920
-
-        from urllib.parse import urlparse
-        source_domain = urlparse(source_url).netloc.replace("www.", "")
-        
-        render_data = {
-            **plan,
-            "original_image": f"data:image/jpeg;base64,{image_base64}" if image_base64 else final_image_url,
-            "cutout_image": cutout_base64,
-            "view_height": height, 
-            "theme": theme,
-            "source_domain": source_domain
-        }
-        
-        from glue import InstagramEngine
-        engine = InstagramEngine()
-        path = await engine.render_post(render_data, template_str, quote_filename, width, height, aspect_ratio=aspect_ratio)
-        
-        if path:
-            from qa_agent import QAAgent
-            from glue import STATIC_DIR
-            abs_img_path = os.path.join(STATIC_DIR, "output", os.path.basename(path))
-            
-            is_approved, reason = await QAAgent.validate_post(abs_img_path, topic)
-            if not is_approved:
-                print(f"🛑 QA REJECTED Quote: {topic} | Reason: {reason}")
-                try:
-                    if os.path.exists(abs_img_path): os.remove(abs_img_path)
-                except Exception as e:
-                    pass
-                return None, f"QA Rejected: {reason}"
-            
-            from glue import DatabaseManager
-            DatabaseManager.save_post(
-                topic, plan['headline'], f"Premium Quote ({theme})", detailed_caption, path, source_url
+            # Refine prompt with analysis and Art Director constraints
+            image_prompt = (
+                f"CRITICAL IDENTITY: {plan.get('character_name', topic)}. "
+                "CRITICAL: NO TEXT, NO WORDS, NO LETTERS IN IMAGE. "
+                f"COMPOSITION: Apply RULE OF THIRDS. Place the subject on the far left or far right third of the frame. "
+                f"NEGATIVE SPACE: Opposite side must be dark, clean, or blurred canvas. "
+                f"STYLE: Unfiltered press photography, 35mm film grain, harsh side-lighting, authentic skin textures. "
+                f"Likeness Details: {image_analysis}. "
+                "QUALITY: No AI smoothing. Mundane bureaucratic Indian setting. NO GENERIC POINTING. NO BOKEH."
             )
-            return path, "Success"
-        return None, "Rendering failed"
+            
+            final_image_url = None
+            image_base64 = None
+            
+            try:
+                img_data = await self.summarizer.client.generate_image(image_prompt, aspect_ratio=aspect_ratio)
+                if img_data:
+                    imagen_filename = f"gen_mag_{timestamp}_{attempt}.jpg"
+                    save_path = os.path.join(OUTPUT_DIR, imagen_filename)
+                    with open(save_path, "wb") as f:
+                        f.write(img_data)
+                    final_image_url = f"/static/output/{imagen_filename}"
+                    image_base64 = base64.b64encode(img_data).decode()
+            except Exception as e:
+                print(f"❌ GCP Image Generation Error: {e}")
+                continue
+
+            # 4. Render with Dynamic Composition
+            quote_filename = f"mag_{timestamp}_{attempt}.jpg"
+            abs_gen_path = os.path.join(OUTPUT_DIR, os.path.basename(final_image_url))
+            
+            # Art Director Analysis
+            comp = DynamicCompositionEngine.analyze_image(abs_gen_path)
+            
+            # Select Template
+            template_path = os.path.join(EXPL_TEMPLATES_DIR, "EDITORIAL", "MAGAZINE.html")
+            with open(template_path, 'r') as f:
+                template_str = f.read()
+                
+            width, height = 1080, 1920 
+
+            from urllib.parse import urlparse
+            source_domain = urlparse(source_url).netloc.replace("www.", "")
+            
+            # Prepare Headline HTML
+            headline = plan.get('headline', topic)
+            words = headline.split()
+            if len(words) > 2:
+                headline_html = f"<span class='accent-word'>{' '.join(words[:2])}</span><br>{' '.join(words[2:])}"
+            else:
+                headline_html = f"<span class='accent-word'>{headline}</span>"
+
+            render_data = {
+                **plan,
+                "headline_html": headline_html,
+                "original_image": f"data:image/jpeg;base64,{image_base64}" if image_base64 else final_image_url,
+                "view_height": height, 
+                "theme": theme,
+                "source_domain": source_domain,
+                "layout": comp['layout'],
+                "colors": comp['colors'],
+                "text_anchor": comp['text_anchor']
+            }
+            
+            from glue import InstagramEngine
+            engine = InstagramEngine()
+            path = await engine.render_post(render_data, template_str, quote_filename, width, height, aspect_ratio="9:16")
+            
+            if path:
+                from qa_agent import QAAgent
+                from glue import STATIC_DIR
+                abs_img_path = os.path.join(STATIC_DIR, "output", os.path.basename(path))
+                
+                # We still run QA for logging/metadata, but we NO LONGER reject the post.
+                is_approved, reason = await QAAgent.validate_post(abs_img_path, topic)
+                print(f"🕵️ [QA REPORT] Approved: {is_approved} | Reason: {reason}")
+                
+                # ALWAYS SAVE to Database as requested by user
+                from glue import DatabaseManager
+                DatabaseManager.save_post(
+                    topic, plan['headline'], f"Magazine ({theme})", detailed_caption, path, source_url
+                )
+                print(f"✅ [AUTONOMOUS] Post saved to gallery: {path}")
+                return path, "Success"
+            
+        return None, "Failed to render post after image generation."

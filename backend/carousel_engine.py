@@ -48,27 +48,14 @@ class CarouselEngine:
     async def plan_carousel(self, news_text, mode="real", language="english"):
         """Phase 1: Content Architect - Gemma plans the narrative."""
         
-        lang_instruction = f"OUTPUT LANGUAGE: {language}"
-        if language == "hinglish":
-            lang_instruction = "OUTPUT LANGUAGE: Hinglish (Romanized Hindi + English mix. Headlines and body text should feel like a conversational WhatsApp mix)."
-        elif language == "hindi":
-            lang_instruction = "OUTPUT LANGUAGE: Hindi (Devanagari script)."
+        lang_instruction = "OUTPUT LANGUAGE: Simple English."
 
-        # Mode-specific persona rules
-        if mode == "satire":
-            persona = (
-                "SYSTEM: You are a high-level Government Spin Doctor.\n"
-                "METHOD: NEVER complain. Reframe every failure as a 'Strategic Choice' or 'Optional Success'.\n"
-                "VOCABULARY: Use simple-but-official words (e.g., 'Atmospheric Optics', 'Strategic Deceleration').\n"
-                "TONE: Deadpan, delusional, 100% serious.\n"
-                "HEADLINE: Follow the 5-WORD RULE. Aggressive, understandable, but official."
-            )
-        else:
-            persona = (
-                "SYSTEM: You are a Lead Financial Editor for a premium global newsroom (Bloomberg style).\n"
-                "TONE: Analytical, high-end, professional, and serious.\n"
-                "HEADLINE: Aggressive editorial style, sophisticated vocabulary."
-            )
+        # Investigative Journalism Persona
+        persona = (
+            "SYSTEM: You are a Senior Investigative Correspondent for 'Humorously Indians'.\n"
+            "TONE: Analytical, deep-dive, professional, and fact-focused.\n"
+            "HEADLINE: Detailed, context-rich investigative style in English."
+        )
 
         prompt = (
             f"{persona}\n"
@@ -128,10 +115,8 @@ class CarouselEngine:
         """Phase 2: Generate caption based on mode."""
         summary = " ".join([s.get('headline', '') for s in plan_data])
         
-        lang_instruction = f"OUTPUT LANGUAGE: {language}"
-        if language == "hinglish":
-            lang_instruction = "OUTPUT LANGUAGE: Hinglish (Romanized Hindi + English mix)."
-        
+        lang_instruction = "OUTPUT LANGUAGE: Simple English."
+
         if mode == "satire":
             prompt = (
                 "SYSTEM: You are a high-level Government Spin Doctor for 'Humorously Indians'.\n"
@@ -144,9 +129,9 @@ class CarouselEngine:
             )
         else:
             prompt = (
-                "SYSTEM: You are a Lead Financial Editor.\n"
+                "SYSTEM: You are a Senior Investigative Lead.\n"
                 f"{lang_instruction}\n"
-                "TASK: Write a professional, punchy Instagram caption summarizing the analysis.\n"
+                "TASK: Write a professional, punchy investigative Instagram caption summarizing the analysis in English.\n"
                 f"CAROUSEL TOPICS: {summary}\n"
                 "TONE: Analytical, insightful, professional.\n"
                 "Include 5-8 hashtags and end with: 'Follow @Humorously_Indians for more posts.'\n"

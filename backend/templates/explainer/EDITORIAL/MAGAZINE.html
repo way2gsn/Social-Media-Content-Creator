@@ -1,0 +1,173 @@
+
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Anton&family=Martel:wght@400;900&family=Playfair+Display:ital,wght@1,900&display=swap');
+        
+        :root {
+            --canvas-width: 1080px;
+            --canvas-height: {{ view_height }}px;
+            --primary: {{ colors[0] if colors else '#000000' }};
+            --accent: {{ colors[3] if colors|length > 3 else '#ff4500' }};
+            --text-main: {{ colors[1] if colors|length > 1 else '#ffffff' }};
+        }
+
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body, html { 
+            width: var(--canvas-width); 
+            height: var(--canvas-height); 
+            overflow: hidden; 
+            background: #1a1a1a;
+            font-family: 'Martel', serif;
+            position: relative;
+        }
+
+        /* Tactical Background Layer (Torn Paper & Grain) */
+        .bg-layer {
+            position: absolute;
+            inset: 0;
+            background-image: url('{{ original_image }}');
+            background-size: cover;
+            background-position: center;
+            filter: contrast(1.1) brightness(0.9) grayscale(0.2);
+            z-index: 1;
+        }
+
+        /* Rule 2: No-Box Typography - Full image gradient for contrast instead of a box */
+        .gradient-overlay {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.3) 50%, rgba(0,0,0,0) 100%);
+            z-index: 3;
+            pointer-events: none;
+        }
+
+        .grain-overlay {
+            position: absolute;
+            inset: 0;
+            background: url('https://www.transparenttextures.com/patterns/carbon-fibre.png');
+            opacity: 0.15;
+            z-index: 4;
+            pointer-events: none;
+        }
+
+
+        /* Dynamic Composition Layouts */
+        .magazine-box {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            padding: 80px;
+            padding-bottom: 120px;
+            {% if layout == 'ASIDE_RIGHT' %}
+            flex-direction: row;
+            justify-content: flex-end;
+            {% elif layout == 'ASIDE_LEFT' %}
+            flex-direction: row;
+            justify-content: flex-start;
+            {% else %}
+            flex-direction: column;
+            justify-content: flex-end;
+            {% endif %}
+        }
+
+        .text-panel {
+            max-width: 800px;
+            display: flex;
+            flex-direction: column;
+            {% if layout == 'ASIDE_RIGHT' %}
+            align-items: flex-start;
+            text-align: left;
+            {% elif layout == 'ASIDE_LEFT' %}
+            align-items: flex-end;
+            text-align: right;
+            {% else %}
+            align-items: center;
+            text-align: center;
+            width: 100%;
+            {% endif %}
+        }
+
+        .headline {
+            font-family: 'Playfair Display', serif;
+            font-style: italic;
+            font-weight: 900;
+            font-size: 80px; /* Reduced from 115px */
+            line-height: 0.95;
+            text-transform: uppercase;
+            color: #ffffff;
+            margin-bottom: 25px;
+            text-shadow: 6px 6px 20px rgba(0,0,0,0.6);
+            word-wrap: break-word;
+        }
+
+        .headline .accent-word {
+            color: var(--accent);
+            font-family: 'Anton', sans-serif;
+            font-style: normal;
+            font-size: 95px; /* Reduced from 140px */
+            text-shadow: none;
+            /* Rule 2: No background boxes */
+            padding: 0;
+            margin: 10px 0;
+            display: inline-block;
+        }
+
+        .subtitle {
+            font-family: 'Anton', sans-serif;
+            font-size: 30px; /* Reduced from 38px */
+            color: #ffffff;
+            /* Rule 2: No boxes behind text */
+            background: none;
+            padding: 0;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            width: fit-content;
+            text-shadow: 4px 4px 15px rgba(0,0,0,0.8);
+        }
+
+        .branding {
+            position: absolute;
+            bottom: 40px;
+            {% if layout == 'ASIDE_RIGHT' %}
+            left: 40px;
+            {% else %}
+            right: 40px;
+            {% endif %}
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            z-index: 20;
+        }
+
+        .brand-logo { width: 60px; height: 60px; border: 3px solid var(--accent); border-radius: 50%; }
+        .brand-name { font-family: 'Anton', sans-serif; font-size: 24px; color: var(--accent); letter-spacing: 5px; }
+
+    </style>
+</head>
+<body>
+    <div class="bg-layer"></div>
+    <div class="gradient-overlay"></div>
+    <div class="grain-overlay"></div>
+
+    <div class="magazine-box">
+        <div class="text-panel">
+            <h1 class="headline">
+                {{ headline_html | safe }}
+            </h1>
+            <p class="subtitle">{{ subtitle }}</p>
+        </div>
+    </div>
+
+    <div class="branding">
+        {% if logo_base64 %}
+            <img src="data:image/png;base64,{{ logo_base64 }}" class="brand-logo" alt="Logo">
+        {% endif %}
+        <span class="brand-name">HUMOROUSLY INDIANS</span>
+    </div>
+</body>
+</html>

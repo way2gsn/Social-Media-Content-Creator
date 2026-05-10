@@ -25,32 +25,37 @@ Write a professional, authoritative 30-45 second documentary script about: "{top
 STYLE: Professional Documentary / News Narrative. Serious, fast-paced, and fact-heavy.
 CRITICAL: You MUST cite sources and data points (e.g., 'According to a recent report by Reuters...', 'Data from the World Bank shows...').
 
-CRITICAL: The narration MUST be written in "Hinglish" (a natural 60/40 mix of Hindi and English). Write Hindi PHONETICALLY.
+CRITICAL: The narration MUST be written in "Romanized Hinglish" (Hindi words written in English letters, mixed with English).
+Avoid Pure Hindi or Devanagari script. Use the language Indians use on WhatsApp or social media.
+
+EDITORIAL HOOK: The first scene MUST start with a "Catchy Hook". This should be a controversial line, a shocking fact, or a bold statement that hooks the audience instantly.
 
 VISUALS: Every scene MUST be unique. Specify "Indian context" for all visual prompts. 
 
 For each scene, provide:
-1. "narration": Spoken text in Hinglish with source citations.
+1. "narration": Spoken text in Romanized Hinglish with source citations.
 2. "veo_prompt": Unique cinematic visual prompt (9:16).
 3. "source_name": Name of the source being cited (e.g., "REUTERS").
 
-4. "instagram_caption": Generate a viral, ultra-detailed Instagram caption (100-150 words) in Hinglish. Include a catchy headline, a summary of the data points, relevant hashtags, and a call to action.
+4. "instagram_caption": Generate a viral, ultra-detailed Instagram caption (100-150 words) in Simple English. Include a catchy headline, a summary of the data points, relevant hashtags, and a call to action.
 
 Output MUST be a valid JSON object. Format example:
 {{
-    "headline": "Video Title",
-    "instagram_caption": "Viral caption here...",
+    "headline": "Education Inequality: The Harsh Reality",
+    "instagram_caption": "Detailed investigative report on the current state of Indian education...",
     "scenes": [
         {{
-            "narration": "Reuters ke according...",
-            "veo_prompt": "Cinematic shot...",
-            "source_name": "REUTERS"
+            "narration": "Kya aapko pata hai ki India ke education system mein abhi bhi kitna bada gap hai? NITI Aayog ki report ne saare pol khol diye hain.",
+            "veo_prompt": "Cinematic wide shot of a rural Indian school building, professional photography style, rule of thirds.",
+            "source_name": "NITI AAYOG"
         }}
     ]
 }}
 """
         response_text = await self.gcp.generate_text(prompt, use_pro=True)
-        if not response_text: return None
+        if not response_text: 
+            print(f"❌ [VIDEO ENGINE] AI returned empty response.")
+            return None
         
         try:
             # Clean markdown formatting if present
@@ -59,13 +64,13 @@ Output MUST be a valid JSON object. Format example:
             cleaned = re.sub(r'\n?```\s*$', '', cleaned)
             return json.loads(cleaned)
         except Exception as e:
-            print(f"Video Script JSON Error: {e} | Raw: {response_text}")
+            print(f"❌ [VIDEO ENGINE] JSON Error: {e} | Raw: {response_text[:500]}...")
             return None
 
     async def generate_video(self, topic: str, voice: str = "en-IN-Chirp3-HD-Zephyr"):
         script_data = await self.generate_script(topic)
         if not script_data or 'scenes' not in script_data:
-            return None, "Failed to generate script"
+            return None, "Failed to generate script", None
 
         session_id = f"cine_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
         session_dir = os.path.join(OUTPUT_DIR, session_id)
@@ -81,7 +86,7 @@ Output MUST be a valid JSON object. Format example:
         
         # Check for failures
         if any(not r for r in scene_results):
-            return None, "Failed to generate some scene assets"
+            return None, "Failed to generate some scene assets", None
 
         # Assemble with FFmpeg
         final_video_path = os.path.join(OUTPUT_DIR, f"{session_id}.mp4")
@@ -115,7 +120,7 @@ Output MUST be a valid JSON object. Format example:
             stdout, stderr = await process.communicate()
             if process.returncode != 0:
                 print(f"FFmpeg Concat Error: {stderr.decode()}")
-                return None, "Video assembly failed"
+                return None, "Video assembly failed", None
                 
             # Clean up temp dir
             import shutil

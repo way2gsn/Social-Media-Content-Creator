@@ -234,15 +234,18 @@ export default function Home() {
                   <label className="text-[10px] uppercase font-black text-slate-500 tracking-[0.25em] mb-4 block">Topic / News Context</label>
                   <textarea value={topics} onChange={e=>setTopics(e.target.value)} placeholder="Describe the news or paste a headline..."
                     className="w-full bg-black/40 border border-white/5 rounded-2xl p-6 text-white text-lg placeholder:text-slate-700 focus:outline-none focus:border-amber-500/50 transition-all h-48 resize-none"/>
-                  <div className="mt-8 pt-8 border-t border-white/5 grid grid-cols-3 gap-4">
+                  <div className="mt-8 pt-8 border-t border-white/5 grid grid-cols-2 md:grid-cols-4 gap-4">
                     <button onClick={()=>handleGenerate('/generate')} className="h-20 bg-white text-black font-black uppercase tracking-widest text-[10px] rounded-2xl hover:bg-slate-200 transition-all flex flex-col items-center justify-center gap-2 group">
-                      <Newspaper size={22} className="group-hover:scale-110 transition-transform"/>Standard Post
+                      <Newspaper size={22} className="group-hover:scale-110 transition-transform"/>Standard
                     </button>
                     <button onClick={()=>handleGenerate('/generate-carousel')} className="h-20 bg-amber-500 text-black font-black uppercase tracking-widest text-[10px] rounded-2xl hover:bg-amber-400 transition-all flex flex-col items-center justify-center gap-2 group shadow-[0_0_40px_rgba(245,158,11,0.15)]">
                       <Layers size={22} className="group-hover:scale-110 transition-transform"/>Carousel
                     </button>
                     <button onClick={()=>handleGenerate('/generate-quote')} className="h-20 bg-[#d97706] text-black font-black uppercase tracking-widest text-[10px] rounded-2xl hover:bg-[#b45309] hover:text-white transition-all flex flex-col items-center justify-center gap-2 group shadow-[0_0_40px_rgba(217,119,6,0.2)]">
-                      <Sparkles size={22} className="group-hover:scale-110 transition-transform"/>Quote Post
+                      <Sparkles size={22} className="group-hover:scale-110 transition-transform"/>Quote
+                    </button>
+                    <button onClick={()=>handleGenerate('/generate-magazine')} className="h-20 bg-emerald-600 text-white font-black uppercase tracking-widest text-[10px] rounded-2xl hover:bg-emerald-500 transition-all flex flex-col items-center justify-center gap-2 group shadow-[0_0_40px_rgba(16,185,129,0.2)] border border-emerald-400/30">
+                      <Sparkles size={22} className="group-hover:scale-110 transition-transform"/>Magazine Test
                     </button>
                   </div>
                 </div>
