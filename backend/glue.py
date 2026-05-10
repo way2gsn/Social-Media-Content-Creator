@@ -221,7 +221,12 @@ class AISummarizer:
         
         prompt = (f"Analyze this news in depth: {title}. {text}.\n"
                   "1. Create a detailed, context-rich ENGLISH headline (UPPERCASE). MAX 8 WORDS.\n"
-                  "2. Create a 1-line investigative summary in English that provides critical background context. MAX 15 WORDS.\n"
+                  "2. Create a 1-line investigative summary in English providing critical background. MAX 15 WORDS.\n\n"
+                  "CRITICAL EDITORIAL RULES:\n"
+                  "- NO COLONS (:) or LABELS. Never write 'Topic: Headline'. Just write the headline.\n"
+                  "- NO COPY-PASTING. Rewrite the title from scratch to provide better investigative context.\n"
+                  "- NO SOURCE NAMES. Never mention the name of the newspaper (e.g., 'The Hindu', 'Reuters') in the image text.\n"
+                  "- SIMPLE & DIRECT. Explain the actual impact or event in plain English.\n"
                   "Output strictly as a JSON object with keys 'headline', 'subtitle'.")
         
         result = await self.client.generate_text(prompt, system_instruction=system)
