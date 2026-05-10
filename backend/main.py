@@ -310,6 +310,30 @@ async def delete_post(post_id: int):
         print(f"ERROR: Delete post failed: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
 
+@app.get("/carousel-files/{path:path}")
+async def get_carousel_files(path: str):
+    try:
+        from glue import STATIC_DIR
+        # Clean the path to avoid directory traversal
+        clean_path = path.replace("..", "").strip("/")
+        full_path = os.path.join(STATIC_DIR, "output", clean_path)
+        
+        # If it's a file, get the parent directory
+        if os.path.isfile(full_path):
+            full_dir = os.path.dirname(full_path)
+        else:
+            full_dir = full_path
+            
+        if not os.path.exists(full_dir):
+            return JSONResponse({"error": f"Directory not found"}, status_code=404)
+        
+        # Get all images, sorted by name
+        files = sorted([f for f in os.listdir(full_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg'))])
+        return {"files": files}
+    except Exception as e:
+        print(f"ERROR listing carousel files: {e}")
+        return JSONResponse({"error": str(e)}, status_code=500)
+
 @app.get("/task/{task_id}")
 async def get_task_status(task_id: str):
     if task_id not in tasks:

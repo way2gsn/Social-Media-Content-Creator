@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { Sparkles, Newspaper, History, Download, Layers, AlertCircle, Settings, Calendar, Clock, Trash2, Send, Play } from 'lucide-react';
+import { Sparkles, Newspaper, History, Download, Layers, AlertCircle, Settings, Calendar, Clock, Trash2, Send, Play, Layout } from 'lucide-react';
 
 const API = typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:8000` : 'http://localhost:8000';
 
@@ -18,6 +18,7 @@ export default function Home() {
   const [settings, setSettings] = useState<any>({});
   const [isSaving, setIsSaving] = useState(false);
   const [schedules, setSchedules] = useState<any[]>([]);
+  const [carouselFiles, setCarouselFiles] = useState<string[]>([]);
   const [scheduleModal, setScheduleModal] = useState<any>(null);
   const [scheduleTime, setScheduleTime] = useState('');
   const [serverVersion, setServerVersion] = useState<string>('...');
@@ -36,6 +37,20 @@ export default function Home() {
     }
     return () => clearInterval(iv);
   }, [activeTask]);
+
+  useEffect(() => {
+    if (selectedPost && selectedPost.asset_path.includes('carousels/')) {
+      fetch(`${API}/carousel-files/${selectedPost.asset_path}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.files) setCarouselFiles(data.files);
+          else setCarouselFiles([]);
+        })
+        .catch(() => setCarouselFiles([]));
+    } else {
+      setCarouselFiles([]);
+    }
+  }, [selectedPost]);
 
   const fetchGallery = async () => { try { const r = await fetch(`${API}/gallery`); const d = await r.json(); setGallery(d.posts || []); } catch {} };
   const fetchSettings = async () => { try { const r = await fetch(`${API}/settings`); setSettings(await r.json()); } catch {} };
@@ -365,7 +380,14 @@ export default function Home() {
                         <video src={`${API}/static/output/${p.asset_path}`} className="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity" muted loop playsInline onMouseEnter={e=>e.currentTarget.play()} onMouseLeave={e=>{e.currentTarget.pause();e.currentTarget.currentTime=0;}}/>
                     </div>
                   ) : (
-                    <img src={`${API}/static/output/${p.asset_path}`} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt={p.headline}/>
+                    <div className="w-full h-full relative">
+                      <img src={`${API}/static/output/${p.asset_path}`} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt={p.headline}/>
+                      {p.asset_path.includes('carousels/') && (
+                        <div className="absolute top-4 left-4 bg-amber-500 text-black text-[9px] font-black px-2 py-1 rounded-md shadow-xl z-20 flex items-center gap-1">
+                          <Layout size={10}/> CAROUSEL
+                        </div>
+                      )}
+                    </div>
                   )}
                   <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex flex-col justify-end p-6">
                     <div className="absolute top-4 right-4 flex gap-2">
@@ -480,22 +502,55 @@ export default function Home() {
             <button onClick={() => setSelectedPost(null)} className="absolute top-4 right-4 md:top-8 md:right-8 z-[110] p-3 bg-white/5 hover:bg-amber-500 hover:text-black rounded-full transition-all">
                 <Trash2 size={20} className="rotate-45"/>
             </button>
-                <div className="w-full md:flex-1 bg-black flex items-center justify-center relative overflow-hidden group min-h-[40vh] md:min-h-0">
-                  {selectedPost.asset_path.endsWith('.mp4') ? (
-                    <video 
-                      src={selectedPost.asset_path.startsWith('http') ? selectedPost.asset_path : `${API}/static/output/${selectedPost.asset_path.replace('static/output/', '').replace(/^\/+/, '')}`} 
-                      controls 
-                      className="max-h-full max-w-full object-contain" 
-                    />
+                <div className="w-full md:flex-1 bg-black flex flex-col relative overflow-hidden group min-h-[40vh] md:min-h-0">
+                  {carouselFiles.length > 0 ? (
+                    <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 custom-scrollbar bg-zinc-950">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-amber-500/50 mb-4 text-center">Carousel Slides ({carouselFiles.length})</p>
+                      {carouselFiles.map((f, i) => {
+                        const basePath = selectedPost.asset_path.substring(0, selectedPost.asset_path.lastIndexOf('/') + 1);
+                        const slideUrl = `${API}/static/output/${basePath.replace(/^\/+/, '')}${f}`;
+                        return (
+                        <div key={i} className="relative group/slide rounded-2xl overflow-hidden border border-white/5 bg-white/[0.02]">
+                          <img 
+                            src={slideUrl} 
+                            className="w-full h-auto object-contain shadow-2xl"
+                            alt={`Slide ${i+1}`}
+                          />
+                          <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover/slide:opacity-100 transition-opacity">
+                            <a 
+                              href={slideUrl} 
+                              download 
+                              className="p-3 bg-amber-500 text-black rounded-xl shadow-xl hover:scale-105 transition-transform"
+                            >
+                              <Download size={18}/>
+                            </a>
+                          </div>
+                          <div className="absolute bottom-4 left-4 px-3 py-1 bg-black/60 backdrop-blur-md rounded-full border border-white/10">
+                            <span className="text-[10px] font-black text-white/80 uppercase tracking-widest">Slide {i+1}</span>
+                          </div>
+                        </div>
+                        );
+                      })}
+                    </div>
+                  ) : selectedPost.asset_path.endsWith('.mp4') ? (
+                    <div className="flex-1 flex items-center justify-center p-4">
+                      <video 
+                        src={selectedPost.asset_path.startsWith('http') ? selectedPost.asset_path : `${API}/static/output/${selectedPost.asset_path.replace('static/output/', '').replace(/^\/+/, '')}`} 
+                        controls 
+                        className="max-h-full max-w-full object-contain rounded-xl shadow-2xl" 
+                      />
+                    </div>
                   ) : (
-                    <img 
-                      src={selectedPost.asset_path.startsWith('http') ? selectedPost.asset_path : `${API}/static/output/${selectedPost.asset_path.replace('static/output/', '').replace(/^\/+/, '')}`} 
-                      alt={selectedPost.headline} 
-                      className="max-h-full max-w-full object-contain"
-                    />
+                    <div className="flex-1 flex items-center justify-center p-4">
+                      <img 
+                        src={selectedPost.asset_path.startsWith('http') ? selectedPost.asset_path : `${API}/static/output/${selectedPost.asset_path.replace('static/output/', '').replace(/^\/+/, '')}`} 
+                        alt={selectedPost.headline} 
+                        className="max-h-full max-w-full object-contain rounded-xl shadow-2xl"
+                      />
+                    </div>
                   )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-8">
-                    <p className="text-white/60 text-[10px] font-mono tracking-tighter truncate">{selectedPost.asset_path}</p>
+                  <div className="absolute bottom-4 right-4 bg-black/40 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <p className="text-white/40 text-[9px] font-mono tracking-tighter truncate max-w-[200px]">{selectedPost.asset_path}</p>
                   </div>
                 </div>
             <div className="w-full md:w-1/2 p-6 md:p-12 flex flex-col overflow-y-auto custom-scrollbar">
