@@ -97,6 +97,216 @@ class GCPClient:
             print(f"GCP CRITICAL ERROR: {str(e)}")
 
         self.initialized = True
+
+    async def research_topic(self, topic: str) -> dict:
+        """Research a topic using Gemini + Google Search Grounding.
+        Returns: {summary: str, sources: [{title, url}], facts: [str]}
+        """
+        import asyncio
+        loop = asyncio.get_event_loop()
+        
+        research_prompt = f"""You are an investigative journalist researching: "{topic}"
+
+Search the web and compile a comprehensive research brief with:
+1. KEY FACTS: List 5-8 specific, verifiable data points with numbers, dates, and statistics.
+2. SOURCES: For each fact, note the exact source name (e.g., "Reuters", "NDTV", "Economic Times").
+3. CONTEXT: Provide background context that explains why this topic matters right now.
+4. RECENT DEVELOPMENTS: What happened in the last 7 days related to this topic?
+
+Be specific. Use real numbers. Cite real reports. This will be used to create a factual documentary script.
+Format as a structured research brief, NOT JSON."""
+
+        print(f"🔍 [RESEARCH] Searching web for: {topic}...")
+        
+        locations = ["us-central1", "europe-west4", "global"]
+        
+        for loc in locations:
+            try:
+                temp_client = genai.Client(
+                    vertexai=True,
+                    project=self.project_id,
+                    location=loc,
+                    credentials=self.credentials
+                )
+                
+                response = await loop.run_in_executor(
+                    None,
+                    lambda: temp_client.models.generate_content(
+                        model="gemini-2.5-flash",
+                        contents=research_prompt,
+                        config=types.GenerateContentConfig(
+                            tools=[
+                                types.Tool(google_search=types.GoogleSearch())
+                            ],
+                            temperature=0.1,
+                            max_output_tokens=4096
+                        )
+                    )
+                )
+                
+                if not response or not response.text:
+                    continue
+                
+                result = {
+                    "summary": response.text.strip(),
+                    "sources": [],
+                    "source_urls": []
+                }
+                
+                # Extract grounding metadata (source URLs)
+                try:
+                    candidate = response.candidates[0]
+                    if candidate.grounding_metadata and candidate.grounding_metadata.grounding_chunks:
+                        seen_titles = set()
+                        for chunk in candidate.grounding_metadata.grounding_chunks:
+                            if chunk.web and chunk.web.title and chunk.web.title not in seen_titles:
+                                seen_titles.add(chunk.web.title)
+                                result["sources"].append({
+                                    "title": chunk.web.title,
+                                    "url": chunk.web.uri or ""
+                                })
+                                if chunk.web.uri:
+                                    result["source_urls"].append(chunk.web.uri)
+                        
+                        print(f"📰 [RESEARCH] Found {len(result['sources'])} sources:")
+                        for s in result["sources"][:5]:
+                            print(f"   📄 {s['title']}")
+                except Exception as meta_err:
+                    print(f"⚠️ [RESEARCH] Could not extract grounding metadata: {meta_err}")
+                
+                return result
+                
+            except Exception as e:
+                print(f"⚠️ [RESEARCH] Error in {loc}: {e}")
+                continue
+        
+        print(f"⚠️ [RESEARCH] All regions failed. Proceeding without research.")
+        return {"summary": "", "sources": [], "source_urls": []}
+
+    async def extract_article_images(self, source_urls: list) -> list:
+        """Fetch Open Graph images from article URLs.
+        Returns list of {url, image_bytes, mime_type} dicts.
+        """
+        import asyncio
+        import urllib.request
+        import urllib.error
+        import re
+        import ssl
+        
+        loop = asyncio.get_event_loop()
+        images = []
+        
+        if not source_urls:
+            return images
+        
+        print(f"🖼️ [RESEARCH] Extracting images from {len(source_urls)} source articles...")
+        
+        ctx = ssl.create_default_context()
+        
+        def _fetch_og_image(url):
+            """Fetch the OG image from a single URL."""
+            try:
+                # Follow redirects to get the actual article URL
+                req = urllib.request.Request(url, headers={
+                    'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1)'
+                })
+                with urllib.request.urlopen(req, timeout=8, context=ctx) as resp:
+                    # Only read first 50KB to find OG tags
+                    html = resp.read(50000).decode('utf-8', errors='ignore')
+                    final_url = resp.url
+                
+                # Extract og:image
+                og_match = re.search(r'<meta\s+(?:property|name)=["\']og:image["\']\s+content=["\'](.*?)["\']', html, re.IGNORECASE)
+                if not og_match:
+                    og_match = re.search(r'content=["\'](.*?)["\']\s+(?:property|name)=["\']og:image["\']', html, re.IGNORECASE)
+                
+                if not og_match:
+                    return None
+                
+                img_url = og_match.group(1)
+                if not img_url.startswith('http'):
+                    return None
+                
+                # Download the image
+                img_req = urllib.request.Request(img_url, headers={
+                    'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1)'
+                })
+                with urllib.request.urlopen(img_req, timeout=10, context=ctx) as img_resp:
+                    img_bytes = img_resp.read()
+                    content_type = img_resp.headers.get('Content-Type', 'image/jpeg')
+                
+                if len(img_bytes) < 5000:  # Skip tiny images (icons, etc.)
+                    return None
+                
+                return {
+                    "url": final_url,
+                    "image_url": img_url,
+                    "image_bytes": img_bytes,
+                    "mime_type": content_type.split(';')[0].strip()
+                }
+            except Exception:
+                return None
+        
+        # Process up to 5 URLs
+        for url in source_urls[:5]:
+            try:
+                result = await loop.run_in_executor(None, _fetch_og_image, url)
+                if result:
+                    images.append(result)
+                    print(f"   ✅ Got image from: {result['url'][:60]}... ({len(result['image_bytes'])} bytes)")
+            except Exception:
+                continue
+        
+        print(f"🖼️ [RESEARCH] Extracted {len(images)} article images.")
+        return images
+
+    async def analyze_image_relevance(self, image_bytes: bytes, topic: str) -> bool:
+        """Use Gemini Vision to check if an article image is cinematically useful.
+        Returns True if the image is a real, relevant photograph suitable for a documentary reel.
+        Returns False for logos, posters, graphics, screenshots, or irrelevant images.
+        """
+        import asyncio
+        loop = asyncio.get_event_loop()
+        
+        try:
+            # Determine mime type
+            mime_type = "image/jpeg"
+            if image_bytes[:8] == b'\x89PNG\r\n\x1a\n':
+                mime_type = "image/png"
+            elif image_bytes[:4] == b'RIFF':
+                mime_type = "image/webp"
+            
+            image_part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
+            
+            analysis_prompt = f"""Analyze this image for use in a cinematic documentary reel about: "{topic}"
+
+Answer ONLY "YES" or "NO" based on these rules:
+- YES: Real photograph of people, places, events, buildings, infrastructure, nature — something visually interesting for a documentary.
+- NO: Logo, brand graphic, poster, banner, advertisement, app screenshot, text-heavy infographic, social media post, cartoon, icon, stock illustration, watermarked preview, or any image that would look unprofessional in a documentary.
+
+One word answer only: YES or NO"""
+
+            response = await loop.run_in_executor(
+                None,
+                lambda: self.genai_client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=[analysis_prompt, image_part],
+                    config=types.GenerateContentConfig(
+                        temperature=0.0,
+                        max_output_tokens=10
+                    )
+                )
+            )
+            
+            if response and response.text:
+                answer = response.text.strip().upper()
+                return answer.startswith("YES")
+            
+            return False
+        except Exception as e:
+            print(f"   ⚠️ Image analysis failed: {e}")
+            return False  # Reject on error — safer to generate fresh
+
     async def generate_text(self, prompt, system_instruction=None, json_mode=True, use_pro=False):
         """Generates text using Gemini 1.5 Flash or Pro via the modern GenAI SDK."""
         import asyncio

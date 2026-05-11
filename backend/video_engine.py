@@ -18,12 +18,28 @@ class CinematicVideoEngine:
     def __init__(self):
         self.gcp = get_gcp_client()
 
-    async def generate_script(self, topic: str):
+    async def generate_script(self, topic: str, research: dict = None):
+        """Generate a documentary script. If research is provided, use it as context."""
+        
+        research_context = ""
+        if research and research.get("summary"):
+            source_names = ", ".join([s["title"] for s in research.get("sources", [])[:5]])
+            research_context = f"""
+VERIFIED RESEARCH BRIEF (from live web search — USE ONLY THESE FACTS):
+---
+{research['summary']}
+---
+Sources Found: {source_names}
+
+CRITICAL: Base your script ONLY on the facts above. Do NOT fabricate any data points. 
+If the research mentions specific numbers, dates, or reports — use them exactly as stated.
+"""
+        
         prompt = f"""You are a world-class investigative journalist and documentary filmmaker.
 Write a professional, authoritative 30-45 second documentary script about: "{topic}"
-
+{research_context}
 STYLE: Professional Documentary / News Narrative. Serious, fast-paced, and fact-heavy.
-CRITICAL: You MUST cite sources and data points (e.g., 'According to a recent report by Reuters...', 'Data from the World Bank shows...').
+CRITICAL: You MUST cite real sources and data points from the research above.
 
 CRITICAL: The narration MUST be written in "Romanized Hinglish" (Hindi words written in English letters, mixed with English).
 Avoid Pure Hindi or Devanagari script. Use the language Indians use on WhatsApp or social media.
@@ -33,13 +49,10 @@ EDITORIAL HOOK: The first scene MUST start with a "Catchy Hook". This should be 
 VISUALS: Every scene MUST be unique. Specify "Indian context" for all visual prompts. 
 
 For each scene, provide:
-1. "narration": Spoken text in Romanized Hinglish with source citations.
-2. "veo_prompt": Unique cinematic visual prompt (9:16). CRITICAL SAFETY RULES FOR veo_prompt:
-   - NEVER mention any real person's name, political party, religion, caste, or ethnicity.
-   - NEVER use words like: protest, violence, arrest, death, corruption, scam, attack, war, weapon, blood, bomb, terror.
-   - ONLY describe abstract visuals: cityscapes, data charts, buildings, documents, hands typing, aerial views, nature, infrastructure.
-   - Keep it purely visual and cinematic. Example: "Aerial drone shot of a modern Indian city skyline at golden hour, 4K cinematic."
-3. "source_name": Name of the source being cited (e.g., "REUTERS").
+1. "narration": Spoken text in Romanized Hinglish with real source citations from the research.
+2. "veo_prompt": Unique cinematic visual prompt (9:16). Describe dramatic, cinematic visuals. 
+   Keep it purely visual and cinematic. Example: "Aerial drone shot of Indian Parliament at golden hour, 4K cinematic."
+3. "source_name": Name of the REAL source being cited (from the research brief).
 
 4. "instagram_caption": Generate a viral, ultra-detailed Instagram caption (100-150 words) in Simple English. Include a catchy headline, a summary of the data points, relevant hashtags, and a call to action.
 
@@ -72,7 +85,18 @@ Output MUST be a valid JSON object. Format example:
             return None
 
     async def generate_video(self, topic: str, voice: str = "en-IN-Chirp3-HD-Zephyr"):
-        script_data = await self.generate_script(topic)
+        # Phase 1: Research the topic with Google Search Grounding
+        print(f"🔬 [CINEMATIC] Phase 1: Researching topic...")
+        research = await self.gcp.research_topic(topic)
+        
+        # Phase 1b: Extract article images from source URLs
+        article_images = []
+        if research.get("source_urls"):
+            article_images = await self.gcp.extract_article_images(research["source_urls"])
+        
+        # Phase 2: Generate script using verified research
+        print(f"📝 [CINEMATIC] Phase 2: Writing script from research...")
+        script_data = await self.generate_script(topic, research=research)
         if not script_data or 'scenes' not in script_data:
             return None, "Failed to generate script", None
 
@@ -81,12 +105,15 @@ Output MUST be a valid JSON object. Format example:
         os.makedirs(session_dir, exist_ok=True)
         print(f"📂 [CINEMATIC] Session Directory: {session_dir}")
 
-        print(f"🎬 [CINEMATIC] Starting production for: {script_data.get('headline')}")
+        print(f"🎬 [CINEMATIC] Phase 3: Production for: {script_data.get('headline')}")
         
         # We will generate TTS and Veo clips sequentially to avoid hitting GCP 429 quota limits
         total_scenes = len(script_data['scenes'])
         scene_results = []
         for idx, scene in enumerate(script_data['scenes']):
+            # Attach available article image to scene (round-robin assignment)
+            if article_images and idx < len(article_images):
+                scene['_article_image'] = article_images[idx]
             res = await self._process_scene(scene, idx, session_dir, voice, total_scenes)
             scene_results.append(res)
         
@@ -99,16 +126,30 @@ Output MUST be a valid JSON object. Format example:
             failed = [i for i, r in enumerate(scene_results) if not r]
             print(f"⚠️ [CINEMATIC] Scenes {failed} failed. Assembling {len(successful_indices)} of {len(scene_results)} scenes.")
 
+        # Generate fixed outro scene — "Follow Humorously Indians" (no visual, black screen)
+        outro_idx = total_scenes  # Use next index after all scenes
+        outro_scene = {
+            "narration": "Agar ye video achi lagi toh follow karo Humorously Indians. Hum laate hain aise hi zabardast aur real content har roz. Follow karo abhi!",
+            "veo_prompt": "__OUTRO_BLACK_SCREEN__",
+            "source_name": "HUMOROUSLY INDIANS"
+        }
+        print(f"🎬 [CINEMATIC] Generating fixed outro scene (black screen)...")
+        outro_result = await self._process_scene(outro_scene, outro_idx, session_dir, voice, total_scenes + 1)
+        
         # Assemble with FFmpeg
         final_video_path = os.path.join(OUTPUT_DIR, f"{session_id}.mp4")
         
-        # Create a concat file for ffmpeg (only successful scenes)
+        # Create a concat file for ffmpeg (only successful scenes + outro)
         concat_path = os.path.join(session_dir, "concat.txt")
         with open(concat_path, "w") as f:
             for idx in successful_indices:
-                # We generated a merged clip for each scene
                 scene_video = os.path.join(session_dir, f"scene_{idx}_merged.mp4")
                 f.write(f"file '{scene_video}'\n")
+            # Append outro if it was generated successfully
+            if outro_result:
+                outro_video = os.path.join(session_dir, f"scene_{outro_idx}_merged.mp4")
+                f.write(f"file '{outro_video}'\n")
+                print(f"✅ [CINEMATIC] Outro scene added to reel.")
 
         # Combine all scenes
         cmd = [
@@ -215,41 +256,111 @@ Output MUST be a valid JSON object. Format example:
         visual_data = None
         is_static = True
         
-        if is_first or is_last:
-            # Step A: Generate a high-quality image first via Imagen 3
-            print(f"🖼️ [VEO] Step 1: Generating reference image for scene {idx+1}...")
-            image_data = await self.gcp.generate_image(scene['veo_prompt'], aspect_ratio="9:16")
+        # Handle special outro black screen
+        if scene.get('veo_prompt') == '__OUTRO_BLACK_SCREEN__':
+            # Create a 1080x1920 black frame
+            from PIL import Image
+            black_img = Image.new('RGB', (1080, 1920), (0, 0, 0))
+            visual_path = os.path.join(session_dir, f"scene_{idx}.jpg")
+            black_img.save(visual_path, 'JPEG')
+            is_static = True
+            print(f"⬛ [OUTRO] Using plain black screen for outro.")
+        else:
+            # Check if we have an article image for this scene (from web research)
+            article_img = scene.get('_article_image')
+            image_data = None
             
-            if image_data:
-                # Step B: Animate the image into a video using Veo 3.1 (image-to-video)
-                # Use a simple, safe animation prompt — no need for complex descriptions
-                animation_prompt = "Slowly animate this scene with subtle cinematic camera movement, smooth zoom, and gentle parallax motion."
-                print(f"🎥 [VEO] Step 2: Animating image with Veo 3.1 (Image-to-Video)...")
-                video_data = await self.gcp.generate_veo_video(animation_prompt, image_bytes=image_data)
+            if article_img:
+                print(f"📰 [SCENE {idx+1}] Checking article image: {article_img.get('image_url', 'unknown')[:60]}...")
+                # Analyze with Gemini Vision — reject logos, posters, graphics
+                is_useful = await self.gcp.analyze_image_relevance(
+                    article_img['image_bytes'], 
+                    scene.get('narration', '')[:100]
+                )
                 
-                if video_data:
-                    visual_data = video_data
-                    is_static = False
-                    print(f"✅ [VEO] Image-to-Video successful for scene {idx+1}!")
+                if is_useful:
+                    print(f"   ✅ Image approved by Vision AI — using for scene {idx+1}")
                 else:
-                    # Veo failed but we still have the image — use it as static
-                    print(f"⚠️ [VEO] Animation failed. Using static image for scene {idx+1}")
-                    visual_data = image_data
-            else:
-                print(f"⚠️ [VEO] Image generation failed for scene {idx+1}")
-
-        if is_static and not visual_data:
-            print(f"🎨 [IMAGEN] Generating cinematic scene {idx+1}: {scene['veo_prompt'][:50]}...")
-            visual_data = await self.gcp.generate_image(scene['veo_prompt'], aspect_ratio="9:16")
-        
-        if not visual_data:
-            print(f"❌ [VISUAL] Failed to generate asset for scene {idx+1}")
-            return False
+                    print(f"   ❌ Image rejected (logo/poster/irrelevant) — generating fresh with Imagen")
+                    article_img = None
             
-        ext = "jpg" if is_static else "mp4"
-        visual_path = os.path.join(session_dir, f"scene_{idx}.{ext}")
-        with open(visual_path, "wb") as f:
-            f.write(visual_data)
+            if article_img:
+                try:
+                    # Resize/crop article image to 9:16 (1080x1920) for reels
+                    from PIL import Image as PILImage
+                    import io
+                    img = PILImage.open(io.BytesIO(article_img['image_bytes']))
+                    img = img.convert('RGB')
+                    
+                    # Center-crop to 9:16 aspect ratio
+                    target_w, target_h = 1080, 1920
+                    target_ratio = target_w / target_h  # 0.5625
+                    
+                    src_w, src_h = img.size
+                    src_ratio = src_w / src_h
+                    
+                    if src_ratio > target_ratio:
+                        # Image is wider — crop sides
+                        new_w = int(src_h * target_ratio)
+                        left = (src_w - new_w) // 2
+                        img = img.crop((left, 0, left + new_w, src_h))
+                    else:
+                        # Image is taller — crop top/bottom
+                        new_h = int(src_w / target_ratio)
+                        top = (src_h - new_h) // 2
+                        img = img.crop((0, top, src_w, top + new_h))
+                    
+                    img = img.resize((target_w, target_h), PILImage.LANCZOS)
+                    
+                    buf = io.BytesIO()
+                    img.save(buf, format='JPEG', quality=95)
+                    image_data = buf.getvalue()
+                    print(f"   ✅ Article image resized to 1080x1920 ({len(image_data)} bytes)")
+                except Exception as e:
+                    print(f"   ⚠️ Article image processing failed: {e}. Falling back to Imagen.")
+                    image_data = None
+            
+            if is_first or is_last:
+                # Step A: Get image (from article or Imagen 3)
+                if not image_data:
+                    print(f"🖼️ [VEO] Step 1: Generating reference image for scene {idx+1}...")
+                    image_data = await self.gcp.generate_image(scene['veo_prompt'], aspect_ratio="9:16")
+                else:
+                    print(f"🖼️ [VEO] Step 1: Using article image for scene {idx+1} (skipping Imagen!)")
+                
+                if image_data:
+                    # Step B: Animate the image into a video using Veo 3.1 (image-to-video)
+                    animation_prompt = "Slowly animate this scene with subtle cinematic camera movement, smooth zoom, and gentle parallax motion."
+                    print(f"🎥 [VEO] Step 2: Animating image with Veo 3.1 (Image-to-Video)...")
+                    video_data = await self.gcp.generate_veo_video(animation_prompt, image_bytes=image_data)
+                    
+                    if video_data:
+                        visual_data = video_data
+                        is_static = False
+                        print(f"✅ [VEO] Image-to-Video successful for scene {idx+1}!")
+                    else:
+                        print(f"⚠️ [VEO] Animation failed. Using static image for scene {idx+1}")
+                        visual_data = image_data
+                else:
+                    print(f"⚠️ [VEO] Image generation failed for scene {idx+1}")
+            else:
+                # Middle scenes: use article image or generate with Imagen
+                if image_data:
+                    visual_data = image_data
+                    print(f"📰 [SCENE {idx+1}] Using article image (skipping Imagen!)")
+
+            if is_static and not visual_data:
+                print(f"🎨 [IMAGEN] Generating cinematic scene {idx+1}: {scene['veo_prompt'][:50]}...")
+                visual_data = await self.gcp.generate_image(scene['veo_prompt'], aspect_ratio="9:16")
+            
+            if not visual_data:
+                print(f"❌ [VISUAL] Failed to generate asset for scene {idx+1}")
+                return False
+                
+            ext = "jpg" if is_static else "mp4"
+            visual_path = os.path.join(session_dir, f"scene_{idx}.{ext}")
+            with open(visual_path, "wb") as f:
+                f.write(visual_data)
 
         # 3. Merge Audio and Video for this scene
         merged_path = os.path.join(session_dir, f"scene_{idx}_merged.mp4")
@@ -315,11 +426,12 @@ Output MUST be a valid JSON object. Format example:
                 out_base
             ]
         else:
+            # For Veo video clips — play ONCE, hold last frame until audio ends (no looping)
             cmd = [
                 ffmpeg_bin, "-y",
-                "-stream_loop", "-1", "-i", vid_base,
+                "-i", vid_base,
                 "-i", aud_base,
-                "-vf", f"subtitles={ass_base}",
+                "-vf", f"tpad=stop_mode=clone:stop_duration=30,subtitles={ass_base}",
                 "-map", "0:v:0", "-map", "1:a:0",
                 "-c:v", "libx264", 
                 "-c:a", "aac",
