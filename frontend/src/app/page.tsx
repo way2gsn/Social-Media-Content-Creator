@@ -518,7 +518,7 @@ export default function Home() {
                           />
                           <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover/slide:opacity-100 transition-opacity">
                             <a 
-                              href={slideUrl} 
+                              href={`${API}/download/${basePath.replace(/^\/+/, '')}${f}`} 
                               download 
                               className="p-3 bg-amber-500 text-black rounded-xl shadow-xl hover:scale-105 transition-transform"
                             >
@@ -579,7 +579,7 @@ export default function Home() {
                   <button onClick={() => handleDeletePost(selectedPost.id)} className="p-4 bg-red-500/10 text-red-500 border border-red-500/20 rounded-2xl hover:bg-red-500 hover:text-white transition-all flex-1 sm:flex-none flex items-center justify-center" title="Delete Post">
                     <Trash2 size={20}/>
                   </button>
-                  <a href={`${API}/static/output/${selectedPost.asset_path}`} download className="p-4 bg-white/5 text-white border border-white/10 rounded-2xl hover:bg-white/10 transition-all flex-1 sm:flex-none flex items-center justify-center" title="Download">
+                  <a href={`${API}/download/${selectedPost.asset_path}`} download className="p-4 bg-white/5 text-white border border-white/10 rounded-2xl hover:bg-white/10 transition-all flex-1 sm:flex-none flex items-center justify-center" title="Download">
                     <Download size={20}/>
                   </a>
                 </div>

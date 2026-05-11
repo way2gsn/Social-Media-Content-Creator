@@ -1,7 +1,7 @@
 from fastapi import FastAPI, BackgroundTasks, Form, Request, UploadFile, File
 import random
 from datetime import datetime, timedelta
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import uuid
@@ -203,6 +203,29 @@ async def perpetual_scheduler():
 @app.get("/version")
 async def get_version():
     return {"version": VERSION}
+
+@app.get("/download/{file_path:path}")
+async def download_file(file_path: str):
+    """Force-download a file (works on iOS Safari where the HTML5 download attribute is ignored)."""
+    full_path = os.path.join(OUTPUT_DIR, file_path)
+    if not os.path.isfile(full_path):
+        return JSONResponse({"error": "File not found"}, status_code=404)
+    
+    filename = os.path.basename(full_path)
+    # Determine media type
+    if filename.endswith('.mp4'):
+        media_type = "video/mp4"
+    elif filename.endswith('.png'):
+        media_type = "image/png"
+    else:
+        media_type = "image/jpeg"
+    
+    return FileResponse(
+        full_path,
+        media_type=media_type,
+        filename=filename,
+        headers={"Content-Disposition": f"attachment; filename=\"{filename}\""}
+    )
 
 @app.get("/gallery")
 async def get_gallery():
