@@ -30,7 +30,7 @@ api_uploader = InstagramAPIEngine()
 
 DB_PATH = os.path.join(BACKEND_DIR, "automation.db")
 # Backend Version (Must match UI version)
-VERSION = "2.1.0" # Neural Mobile Engine Upgrade
+VERSION = "3.0.0" # Veo 3.1 Image-to-Video + iOS Download
 
 app = FastAPI()
 
