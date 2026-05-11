@@ -34,7 +34,11 @@ VISUALS: Every scene MUST be unique. Specify "Indian context" for all visual pro
 
 For each scene, provide:
 1. "narration": Spoken text in Romanized Hinglish with source citations.
-2. "veo_prompt": Unique cinematic visual prompt (9:16).
+2. "veo_prompt": Unique cinematic visual prompt (9:16). CRITICAL SAFETY RULES FOR veo_prompt:
+   - NEVER mention any real person's name, political party, religion, caste, or ethnicity.
+   - NEVER use words like: protest, violence, arrest, death, corruption, scam, attack, war, weapon, blood, bomb, terror.
+   - ONLY describe abstract visuals: cityscapes, data charts, buildings, documents, hands typing, aerial views, nature, infrastructure.
+   - Keep it purely visual and cinematic. Example: "Aerial drone shot of a modern Indian city skyline at golden hour, 4K cinematic."
 3. "source_name": Name of the source being cited (e.g., "REUTERS").
 
 4. "instagram_caption": Generate a viral, ultra-detailed Instagram caption (100-150 words) in Simple English. Include a catchy headline, a summary of the data points, relevant hashtags, and a call to action.
@@ -75,26 +79,33 @@ Output MUST be a valid JSON object. Format example:
         session_id = f"cine_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
         session_dir = os.path.join(OUTPUT_DIR, session_id)
         os.makedirs(session_dir, exist_ok=True)
+        print(f"📂 [CINEMATIC] Session Directory: {session_dir}")
 
         print(f"🎬 [CINEMATIC] Starting production for: {script_data.get('headline')}")
         
         # We will generate TTS and Veo clips sequentially to avoid hitting GCP 429 quota limits
+        total_scenes = len(script_data['scenes'])
         scene_results = []
         for idx, scene in enumerate(script_data['scenes']):
-            res = await self._process_scene(scene, idx, session_dir, voice)
+            res = await self._process_scene(scene, idx, session_dir, voice, total_scenes)
             scene_results.append(res)
         
-        # Check for failures
-        if any(not r for r in scene_results):
-            return None, "Failed to generate some scene assets", None
+        # Skip failed scenes instead of aborting — assemble what we have
+        successful_indices = [i for i, r in enumerate(scene_results) if r]
+        if not successful_indices:
+            return None, "All scenes failed to generate", None
+        
+        if len(successful_indices) < len(scene_results):
+            failed = [i for i, r in enumerate(scene_results) if not r]
+            print(f"⚠️ [CINEMATIC] Scenes {failed} failed. Assembling {len(successful_indices)} of {len(scene_results)} scenes.")
 
         # Assemble with FFmpeg
         final_video_path = os.path.join(OUTPUT_DIR, f"{session_id}.mp4")
         
-        # Create a concat file for ffmpeg
+        # Create a concat file for ffmpeg (only successful scenes)
         concat_path = os.path.join(session_dir, "concat.txt")
         with open(concat_path, "w") as f:
-            for idx in range(len(scene_results)):
+            for idx in successful_indices:
                 # We generated a merged clip for each scene
                 scene_video = os.path.join(session_dir, f"scene_{idx}_merged.mp4")
                 f.write(f"file '{scene_video}'\n")
@@ -126,12 +137,15 @@ Output MUST be a valid JSON object. Format example:
             import shutil
             shutil.rmtree(session_dir, ignore_errors=True)
             
+            print(f"✅ [CINEMATIC] Final Video Ready: {final_video_path}")
+            print(f"🔗 [CINEMATIC] URL: /static/output/{session_id}.mp4")
+            
             return final_video_path, "Success", script_data
         except Exception as e:
             print(f"Assembly Error: {e}")
             return None, str(e), None
 
-    async def _process_scene(self, scene: dict, idx: int, session_dir: str, voice: str):
+    async def _process_scene(self, scene: dict, idx: int, session_dir: str, voice: str, total_scenes: int):
         # 1. Generate Audio and Timepoints via SSML
         words = scene['narration'].replace('"', '').split()
         ssml_parts = ["<speak>"]
@@ -194,23 +208,53 @@ Output MUST be a valid JSON object. Format example:
             else:
                 f.write(f"Dialogue: 0,0:00:00.00,0:00:05.00,Modern,,0,0,0,,{scene['narration']}\n")
 
-        # 2. Skip Veo 3 for now as requested - using Imagen 3 for speed and reliability
-        print(f"🎨 [IMAGEN] Generating cinematic scene {idx+1}: {scene['veo_prompt'][:50]}...")
-        image_bytes = await self.gcp.generate_image(scene['veo_prompt'], aspect_ratio="9:16")
+        # 2. Visual Generation (Veo 3.1 Image-to-Video for First & Last scene, Imagen 3 for others)
+        is_first = (idx == 0)
+        is_last = (idx == total_scenes - 1)
         
+        visual_data = None
         is_static = True
-        if not image_bytes:
-            print(f"❌ [IMAGEN] Failed to generate image for scene {idx+1}")
+        
+        if is_first or is_last:
+            # Step A: Generate a high-quality image first via Imagen 3
+            print(f"🖼️ [VEO] Step 1: Generating reference image for scene {idx+1}...")
+            image_data = await self.gcp.generate_image(scene['veo_prompt'], aspect_ratio="9:16")
+            
+            if image_data:
+                # Step B: Animate the image into a video using Veo 3.1 (image-to-video)
+                # Use a simple, safe animation prompt — no need for complex descriptions
+                animation_prompt = "Slowly animate this scene with subtle cinematic camera movement, smooth zoom, and gentle parallax motion."
+                print(f"🎥 [VEO] Step 2: Animating image with Veo 3.1 (Image-to-Video)...")
+                video_data = await self.gcp.generate_veo_video(animation_prompt, image_bytes=image_data)
+                
+                if video_data:
+                    visual_data = video_data
+                    is_static = False
+                    print(f"✅ [VEO] Image-to-Video successful for scene {idx+1}!")
+                else:
+                    # Veo failed but we still have the image — use it as static
+                    print(f"⚠️ [VEO] Animation failed. Using static image for scene {idx+1}")
+                    visual_data = image_data
+            else:
+                print(f"⚠️ [VEO] Image generation failed for scene {idx+1}")
+
+        if is_static and not visual_data:
+            print(f"🎨 [IMAGEN] Generating cinematic scene {idx+1}: {scene['veo_prompt'][:50]}...")
+            visual_data = await self.gcp.generate_image(scene['veo_prompt'], aspect_ratio="9:16")
+        
+        if not visual_data:
+            print(f"❌ [VISUAL] Failed to generate asset for scene {idx+1}")
             return False
             
-        video_path = os.path.join(session_dir, f"scene_{idx}.jpg")
-        with open(video_path, "wb") as f:
-            f.write(image_bytes)
+        ext = "jpg" if is_static else "mp4"
+        visual_path = os.path.join(session_dir, f"scene_{idx}.{ext}")
+        with open(visual_path, "wb") as f:
+            f.write(visual_data)
 
         # 3. Merge Audio and Video for this scene
         merged_path = os.path.join(session_dir, f"scene_{idx}_merged.mp4")
         
-        vid_base = os.path.basename(video_path)
+        vid_base = os.path.basename(visual_path)
         aud_base = os.path.basename(audio_path)
         ass_base = os.path.basename(ass_path)
         out_base = os.path.basename(merged_path)

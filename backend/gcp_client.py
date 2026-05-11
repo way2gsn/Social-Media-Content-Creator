@@ -522,10 +522,11 @@ class GCPClient:
             print(f"GCS Bucket Error: {e}")
             return None
 
-    async def generate_veo_video(self, prompt: str) -> bytes:
+    async def generate_veo_video(self, prompt: str, image_bytes: bytes = None) -> bytes:
         """
         Generates a cinematic video clip using Vertex AI Veo 3.1 Fast.
-        Uses predictLongRunning REST API and GCS to handle async video generation.
+        Supports image-to-video (preferred) and text-to-video modes.
+        When image_bytes is provided, Veo animates the image into a video clip.
         """
         try:
             import asyncio
@@ -545,7 +546,7 @@ class GCPClient:
             file_name = f"veo_output_{uuid.uuid4().hex[:8]}.mp4"
             gcs_uri = f"gs://{bucket_name}/{file_name}"
             
-            model_name = "veo-3.1-generate-001"
+            model_name = "veo-3.1-fast-generate-001"
                 
             # Force get token
             request = google.auth.transport.requests.Request()
@@ -554,16 +555,30 @@ class GCPClient:
 
             endpoint = f"https://{self.location}-aiplatform.googleapis.com/v1/projects/{self.project_id}/locations/{self.location}/publishers/google/models/{model_name}:predictLongRunning"
             
+            # Build instance — image-to-video if image provided, text-to-video otherwise
+            instance = {"prompt": prompt}
+            
+            if image_bytes:
+                # Determine mime type from bytes
+                mime_type = "image/jpeg"
+                if image_bytes[:8] == b'\x89PNG\r\n\x1a\n':
+                    mime_type = "image/png"
+                
+                image_b64 = base64.b64encode(image_bytes).decode('utf-8')
+                instance["image"] = {
+                    "bytesBase64Encoded": image_b64,
+                    "mimeType": mime_type
+                }
+                print(f"🖼️ [VEO] Mode: Image-to-Video ({len(image_bytes)} bytes, {mime_type})")
+            else:
+                print(f"📝 [VEO] Mode: Text-to-Video")
+            
             payload = {
-                "instances": [
-                    {
-                        "prompt": prompt
-                    }
-                ],
+                "instances": [instance],
                 "parameters": {
                     "aspectRatio": "9:16",
                     "personGeneration": "ALLOW_ALL",
-                    "outputConfig": {"gcsDestination": {"uri": gcs_uri}}
+                    "durationSeconds": 4
                 }
             }
             
@@ -583,41 +598,190 @@ class GCPClient:
                     return json.loads(response.read())
                     
             op_data = await loop.run_in_executor(None, _start_lro)
+            print(f"📡 [VEO] LRO Response: {json.dumps(op_data, indent=2)}")
             if "name" not in op_data: 
                 print("⚠️ [VEO] Failed to start Long Running Operation.")
                 return None
             
             op_name = op_data["name"]
             print(f"🎥 [VEO] Operation started: {op_name}")
-            print(f"⏳ [VEO GCS] Monitoring gs://{bucket_name}/{file_name} for completion...")
+            print(f"⏳ [VEO GCS] Monitoring {gcs_uri} for completion...")
 
-            # 3. Poll GCS directly instead of the broken Operation API
+            # 3. Poll using fetchPredictOperation — try v1beta1 first (where LROs register)
+            api_versions = ["v1beta1", "v1"]
+            active_endpoint = None
+            
+            print(f"📡 [VEO] Waiting 15s for operation to register...")
+            await asyncio.sleep(15)
+            
+            timeout_seconds = 900
+            start_time = time.time()
+            last_progress = -1
+            
+            while time.time() - start_time < timeout_seconds:
+                elapsed = int(time.time() - start_time)
+                try:
+                    # Refresh token every 5 mins
+                    if elapsed > 0 and elapsed % 300 == 0:
+                        request = google.auth.transport.requests.Request()
+                        self.credentials.refresh(request)
+                        token = self.credentials.token
+                        headers["Authorization"] = f"Bearer {token}"
+                        print(f"\n🔑 [VEO] Token refreshed at {elapsed}s")
+                    
+                    def _fetch_op():
+                        endpoints = [active_endpoint] if active_endpoint else [
+                            f"https://{self.location}-aiplatform.googleapis.com/{v}/projects/{self.project_id}/locations/{self.location}/publishers/google/models/{model_name}:fetchPredictOperation"
+                            for v in api_versions
+                        ]
+                        last_err = None
+                        for ep in endpoints:
+                            try:
+                                body = json.dumps({"operationName": op_name}).encode('utf-8')
+                                req = urllib.request.Request(ep, data=body, headers=headers, method='POST')
+                                ctx = ssl.create_default_context()
+                                with urllib.request.urlopen(req, context=ctx) as resp:
+                                    return ep, json.loads(resp.read())
+                            except urllib.error.HTTPError as he:
+                                last_err = he
+                                continue
+                        raise last_err if last_err else Exception("All API versions failed")
+                            
+                    result = await loop.run_in_executor(None, _fetch_op)
+                    working_ep, status_data = result
+                    
+                    if not active_endpoint:
+                        active_endpoint = working_ep
+                        print(f"\n📡 [VEO] Connected: {working_ep}")
+                    
+                    # Check for completion
+                    if status_data.get("done"):
+                        if "error" in status_data:
+                            print(f"\n❌ [VEO] Operation failed: {json.dumps(status_data['error'], indent=2)}")
+                            return None
+                        print(f"\n✅ [VEO] Complete! ({elapsed}s)")
+                        print(f"📡 [VEO] Full response: {json.dumps(status_data, indent=2)[:2000]}")
+                        
+                        # Try to extract video from response directly
+                        response_data = status_data.get("response", {})
+                        
+                        # Veo returns videos under "videos" key (not "predictions")
+                        videos = response_data.get("videos", [])
+                        for vid in videos:
+                            if isinstance(vid, dict):
+                                video_b64 = vid.get("bytesBase64Encoded")
+                                if video_b64:
+                                    print(f"📥 [VEO] Extracting inline video ({len(video_b64)} chars base64)...")
+                                    return base64.b64decode(video_b64)
+                        
+                        # Fallback: check predictions key
+                        predictions = response_data.get("predictions", [])
+                        
+                        for pred in predictions:
+                            # Check for inline video bytes (base64)
+                            if isinstance(pred, dict):
+                                video_b64 = pred.get("bytesBase64Encoded") or pred.get("video", {}).get("bytesBase64Encoded")
+                                if video_b64:
+                                    print(f"📥 [VEO] Extracting inline video data...")
+                                    return base64.b64decode(video_b64)
+                                
+                                # Check for GCS URI in response
+                                video_uri = pred.get("videoUri") or pred.get("gcsUri") or pred.get("video", {}).get("uri")
+                                if video_uri:
+                                    print(f"📥 [VEO] Video at: {video_uri}")
+                                    # Parse and download from the actual URI
+                                    parts = video_uri.replace("gs://", "").split("/", 1)
+                                    actual_bucket = parts[0]
+                                    actual_blob = parts[1] if len(parts) > 1 else file_name
+                                    
+                                    storage_client = storage.Client(credentials=self.credentials, project=self.project_id)
+                                    b = storage_client.bucket(actual_bucket).blob(actual_blob)
+                                    video_data = await loop.run_in_executor(None, b.download_as_bytes)
+                                    print(f"📥 [VEO] Downloaded {len(video_data)} bytes from {video_uri}")
+                                    try:
+                                        await loop.run_in_executor(None, b.delete)
+                                    except: pass
+                                    return video_data
+                        
+                        # Fallback: search the bucket for any recent video files
+                        print(f"🔍 [VEO] Searching bucket {bucket_name} for video files...")
+                        storage_client = storage.Client(credentials=self.credentials, project=self.project_id)
+                        bucket_obj = storage_client.bucket(bucket_name)
+                        
+                        def _find_video():
+                            blobs = list(bucket_obj.list_blobs(prefix="veo_output"))
+                            if not blobs:
+                                # Try listing ALL blobs
+                                blobs = list(bucket_obj.list_blobs())
+                            # Sort by time, newest first
+                            blobs.sort(key=lambda b: b.time_created or datetime.min, reverse=True)
+                            return blobs
+                        
+                        from datetime import datetime
+                        found_blobs = await loop.run_in_executor(None, _find_video)
+                        
+                        if found_blobs:
+                            print(f"🔍 [VEO] Found {len(found_blobs)} files in bucket:")
+                            for fb in found_blobs[:5]:
+                                print(f"   📄 {fb.name} ({fb.size} bytes, created: {fb.time_created})")
+                            
+                            # Download the newest one
+                            newest = found_blobs[0]
+                            video_data = await loop.run_in_executor(None, newest.download_as_bytes)
+                            print(f"📥 [VEO] Downloaded {newest.name}: {len(video_data)} bytes")
+                            try:
+                                await loop.run_in_executor(None, newest.delete)
+                            except: pass
+                            return video_data
+                        
+                        print(f"❌ [VEO] No video files found in bucket {bucket_name}")
+                        break
+                        
+                    # Progress bar
+                    progress = 0
+                    metadata = status_data.get("metadata", {})
+                    if "progressPercentage" in metadata:
+                        progress = metadata["progressPercentage"]
+                    elif "percentDone" in metadata:
+                        progress = metadata["percentDone"]
+                    
+                    bar_len = 20
+                    if progress > 0 and progress > last_progress:
+                        filled_len = int(bar_len * progress / 100)
+                        bar = '█' * filled_len + '░' * (bar_len - filled_len)
+                        print(f"\r🎥 [VEO] |{bar}| {progress}% ({elapsed}s)", end="", flush=True)
+                        last_progress = progress
+                    else:
+                        est = min(95, int((elapsed / 120) * 100))
+                        filled_len = int(bar_len * est / 100)
+                        bar = '█' * filled_len + '░' * (bar_len - filled_len)
+                        print(f"\r🎥 [VEO] |{bar}| ~{est}% ({elapsed}s)", end="", flush=True)
+                            
+                except Exception as e:
+                    if "404" not in str(e):
+                        print(f"\n⚠️ [VEO Poll] {e}")
+                
+                await asyncio.sleep(10)
+
+            print("\n") # New line after progress bar
+            
+            # 4. Final verification and download from GCS
             storage_client = storage.Client(credentials=self.credentials, project=self.project_id)
             bucket = storage_client.bucket(bucket_name)
             blob = bucket.blob(file_name)
             
-            timeout_seconds = 600  # 10 minutes max
-            start_time = time.time()
-            
-            while time.time() - start_time < timeout_seconds:
-                # blob.exists() is a network call, run in executor
-                exists = await loop.run_in_executor(None, blob.exists)
-                if exists:
-                    print(f"✅ [VEO GCS] Video detected! Downloading...")
-                    video_data = await loop.run_in_executor(None, blob.download_as_bytes)
-                    # Clean up
-                    try:
-                        await loop.run_in_executor(None, blob.delete)
-                    except:
-                        pass
-                    return video_data
-                
-                await asyncio.sleep(15) # Poll every 15 seconds
-                elapsed = int(time.time() - start_time)
-                if elapsed % 60 == 0:
-                    print(f"⏳ [VEO GCS] Still waiting... ({elapsed}s elapsed)")
+            exists = await loop.run_in_executor(None, blob.exists)
+            if exists:
+                print(f"✅ [VEO GCS] Video found! Downloading from GCS...")
+                video_data = await loop.run_in_executor(None, blob.download_as_bytes)
+                print(f"📥 [VEO GCS] Downloaded {len(video_data)} bytes.")
+                # Clean up
+                try:
+                    await loop.run_in_executor(None, blob.delete)
+                except: pass
+                return video_data
 
-            print("❌ [VEO GCS] Timeout waiting for video to appear in GCS.")
+            print(f"❌ [VEO GCS] Timeout or file missing at {gcs_uri}")
             return None
             
         except Exception as e:
